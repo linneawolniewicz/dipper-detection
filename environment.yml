@@ -202,4 +202,9 @@ dependencies:
   - zipp=3.19.2=pyhd8ed1ab_0
   - zlib=1.2.13=h4ab18f5_6
   - zstd=1.5.5=hc292b87_2
-prefix: /home/linneamw/sadow_koastore/personal/linneamw/anaconda3/envs/anomaly_detect
+  - pip:
+      - gpytorch==1.11
+      - jaxtyping==0.2.30
+      - linear-operator==0.5.2
+      - typeguard==2.13.3
+prefix: /home/linneamw/sadow_koastore/personal/linneamw/anaconda3/envs/dipper_detect

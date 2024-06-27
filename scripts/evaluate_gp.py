@@ -12,7 +12,8 @@ print("Using device:", device)
 
 # Create an empty results dataframe of length 78 with column names
 # ['filename', 'injected_anomalies', 'identified', 'identified_ratio', 'flagged_anomalies']
-gp_results = pd.DataFrame(columns=['filename', 'injected_anomalies', 'identified', 'identified_ratio', 'flagged_anomalies'])
+column_names = ['filename', 'injected_anomalies', 'identified', 'identified_ratio', 'flagged_anomalies']
+dataframe_rows = []
 
 data_dir = '../data/k2/'
 results_dir = '../results/'
@@ -87,7 +88,7 @@ for i in range(1, 79):
 
     # Hyperparameters
     which_metric = 'msll' # 'rmse', 'nlpd', msll, or default is 'mll'
-    num_anomalies = 2**len(anomaly_locs)
+    num_anomalies = 3**len(anomaly_locs)
     num_steps = len(x)
     anomalous = np.zeros(num_steps) # 0 means non-anomalous, 1 means anomalous at that time step
     initial_lengthscale = None #0.3**2
@@ -197,7 +198,16 @@ for i in range(1, 79):
 
     # Append results to results dataframe
     new_results = {'filename': filename, 'injected_anomalies': anomaly_locs, 'identified': identified, 'identified_ratio': identified_ratio, 'flagged_anomalies': flagged_anomalies}
-    gp_results = gp_results.append(new_results, ignore_index=True)  
+    dataframe_rows.append(new_results)
+
+    # Delete model and likelihood objects
+    del model
+    del likelihood
+    del mll
+    torch.cuda.empty_cache()
+
+# Convert the list of rows to a DataFrame
+gp_results = pd.DataFrame(dataframe_rows, columns=column_names)
 
 # Write gp_results to results_dir
 gp_results.to_csv(results_dir + 'gp_results.csv')        

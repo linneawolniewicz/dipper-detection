@@ -17,14 +17,14 @@ class ExactGPModel(gpytorch.models.ExactGP):
 
 # Function to train GP model
 def train_gp(x_train, y_train, y_err_train, training_iterations=50, lengthscale=None, device=torch.device("cpu")):
-    # Removed using the errors to inform the Gaussian Noise because it leads to numerical instabilities
-    # noise_variances = y_err_train ** 2
-    # min_noise_variance = 0.0001
-    # noise = torch.clamp(noise_variances, min=min_noise_variance)
-    # likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=noise).to(device)
+    # If this gives numerical warnings, use GaussianLikelihood() instead of FixedNoiseGaussianLikelihood()
+    noise_variances = y_err_train ** 2
+    likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(
+        noise=noise_variances, 
+        learn_additional_noise=True
+    ).to(device)
 
     # Initialize likelihood and model
-    likelihood = gpytorch.likelihoods.GaussianLikelihood()
     model = ExactGPModel(x_train, y_train, likelihood).to(device)
 
     # Set lengthscale if given

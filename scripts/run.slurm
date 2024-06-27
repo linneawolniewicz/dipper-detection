@@ -8,7 +8,7 @@
 
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=6 ## # cores per task
-#SBATCH --mem=32gb ## max amount of memory per node you require
+#SBATCH --mem=48gb ## max amount of memory per node you require
 #SBATCH --time=14-00:00:00 ## time format is DD-HH:MM:SS, 3day max on kill-shared, 7day max on exclusive-long, 14day max on sadow
 
 #SBATCH --job-name=gp

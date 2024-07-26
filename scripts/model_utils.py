@@ -1,14 +1,26 @@
 import gpytorch
 import torch
-from gpytorch.kernels import RBFKernel, ScaleKernel
+from gpytorch.kernels import Kernel, PeriodicKernel, RBFKernel, ScaleKernel
 from gpytorch.distributions import MultivariateNormal
+
+# Create a Quasi-Periodic Kernel
+class QuasiPeriodicKernel(Kernel):
+    def __init__(self, **kwargs):
+        super(QuasiPeriodicKernel, self).__init__(**kwargs)
+        self.periodic_kernel = PeriodicKernel()
+        self.rbf_kernel = RBFKernel()
+
+    def forward(self, x1, x2, diag=False, **params):
+        periodic_part = self.periodic_kernel.forward(x1, x2, diag=diag, **params)
+        rbf_part = self.rbf_kernel.forward(x1, x2, diag=diag, **params)
+        return periodic_part * rbf_part
 
 # Define GP model
 class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = ScaleKernel(RBFKernel())
+        self.covar_module = ScaleKernel(QuasiPeriodicKernel())
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -29,7 +41,7 @@ def train_gp(x_train, y_train, y_err_train, training_iterations=50, lengthscale=
 
     # Set lengthscale if given
     if lengthscale is not None:
-        model.covar_module.base_kernel.lengthscale = torch.ones_like(model.covar_module.base_kernel.lengthscale) * lengthscale
+        model.covar_module.base_kernel.rbf_kernel.lengthscale = torch.ones_like(model.covar_module.base_kernel.rbf_kernel.lengthscale) * lengthscale
     
     # Find optimal hyperparameters
     model.train()

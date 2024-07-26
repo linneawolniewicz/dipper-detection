@@ -12,63 +12,29 @@ print("Using device:", device)
 
 # Create an empty results dataframe of length 78 with column names
 # ['filename', 'injected_anomalies', 'identified', 'identified_ratio', 'flagged_anomalies']
-column_names = ['filename', 'injected_anomalies', 'identified', 'identified_ratio', 'flagged_anomalies']
+column_names = ['filename', 'identified_ratio', 'depth', 'width_stdev', 'loc_value']
 dataframe_rows = []
 
 data_dir = '../data/k2/'
 results_dir = '../results/'
 
-# For each k2 fits file, laod the data, inject anomalies, detect them with a gp, and write to the results_dir
-for i in range(1, 79):
-    # Load a file and inject an anomaly
-    filename = f'k2_{i}.fits'
-    fits_file = fits.open(data_dir + filename)
+# Define variables we will explore recovery w.r.t.
+# TODO: Adjust these values. Look at lightcurves to decide reasonable ranges. Should locations be evenly spaced?
+file_numbers = [3, 18, 48]
+locations = np.linspace(0.1, 0.9, 4)
+widths = np.linspace(0.001, 0.1, 10)
+amps = np.linspace(-15, -3, 10)
 
+# For each k2 fits file: load the data, 
+# inject anomaly at each location for varying widths and heights,
+# detect them with a gp, write whether discovered or not to a file
+for i in file_numbers:
     # Load data
-    data = fits_file[1].data
-    time = np.array(data['TIME'])
-    pdc_flux = np.array(data['PDCSAP_FLUX'])
-    pdc_err = np.array(data['PDCSAP_FLUX_ERR'])
-
-    # Set x, y, and error
-    x = time
-    y = pdc_flux / np.nanmedian(pdc_flux)
-    y_err = pdc_err / np.nanmedian(pdc_flux)
-
-    # Clean
-    clean = (y_err > 0.)
-    x = x[clean]
-    y = y[clean]
-    y_err = np.abs(y_err[clean]) 
-
-    # Shift to start at time 0
-    x = x - np.min(x) 
-
-    # Bin to 30-minute cadence
-    num_bins = int(np.floor((np.max(x) - np.min(x)) * 48) + 1) # 48 bins per day
-    x_bins = np.min(x) + np.arange(num_bins + 1) / 48.
-    num_binned, bin_edges = np.histogram(x, bins= x_bins)
-    num_binned = np.array(num_binned)
-    y_binned, bin_edges = np.histogram(x, bins = x_bins, weights = y)
-    var_binned, bin_edges = np.histogram(x, bins = x_bins, weights= 1 / y_err**2)
-    y_err_binned = 1 / np.sqrt(np.array(var_binned))
-    y_binned = np.array(y_binned)
-    y_binned = y_binned / (num_binned + 0.001)
-    x_binned = x_bins[0:num_bins] + (x_bins[1] - x_bins[0]) / 2. 
-    x = x_binned
-    y = y_binned
-    y_err = y_err_binned
-
-    # Clean
-    clean = ((y > 0.) & ~np.isnan(y_err))
-    x = x[clean]
-    y = y[clean]
-    y_err = y_err[clean]
-
-    assert len(x) == len(y) == len(y_err), 'Lengths of x, y, and y_err must be the same'
+    filename = f'k2_{i}.fits'
+    x, y, y_err = load_k2_data(data_dir + filename)
 
     # Inject anomalies
-    steps, y, anomaly_locs = inject_anomaly(y, num_anomalies=np.random.randint(1, 3), seed=i)
+    steps, y, anomaly_locs = inject_anomaly(y, num_anomalies=np.random.randint(1, 3), seed=i, shapes=["gaussian"])
 
     # Standardize data to have mean 0 and std of 1
     mean_y = np.mean(y)

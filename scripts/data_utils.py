@@ -33,11 +33,14 @@ def generate_anomaly(
     for i in range(num_anomalies):
         if locs is not None:
             assert len(locs) == num_anomalies, "Number of anomaly locations must match number of anomalies"
+            assert isinstance(locs, list), "Locs must be a list"
             anomaly_loc = locs[i]
         else:
             anomaly_loc = num_steps * rng.random()
             
         anomaly_locs.append(anomaly_loc)
+
+        assert isinstance(shapes, list), "Shapes must be a list"
         shape = rng.choice(shapes)
 
         if shape == "gaussian":

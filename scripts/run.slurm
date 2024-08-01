@@ -22,7 +22,7 @@ source ~/profiles/auto.profile
 source activate dipper_detect
 
 # use this command to run a python script
-python evaluate_gp.py 
+# python evaluate_gp.py 
 
 # use this command to run an ipynb and save outputs in the notebook
 # jupyter nbconvert --execute --clear-output file.ipynb 
@@ -30,3 +30,28 @@ python evaluate_gp.py
 # Another command to create a .py script, then run that from a ipynb:
 # jupyter nbconvert file.ipynb --to python
 # python file.py
+
+# Create a for loop to run the script with different arguments
+file_numbers=(3 18 48)
+locs=(500 1750 3000)
+widths=(2 14 26 38 50)
+amps=(-5.0 -4.0 -3.0 -2.0 -1.0)
+shapes=('gaussian')
+
+for file_number in "${file_numbers[@]}" 
+do
+    for loc in "${locs[@]}" 
+    do
+        for width in "${widths[@]}" 
+        do
+            for amp in "${amps[@]}" 
+            do
+                for shape in "${shapes[@]}" 
+                do
+                    echo "Running file_number: $file_number with anomaly parameters loc: $loc, width: $width, amp: $amp, shape: $shape"
+                    python evaluate_gp.py --file_number $file_number --loc $loc --width $width --amp $amp --shape $shape
+                done
+            done
+        done
+    done
+done

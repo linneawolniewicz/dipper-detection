@@ -2,22 +2,22 @@
 # See https://slurm.schedmd.com/job_array.html
 # See https://uhawaii.atlassian.net/wiki/spaces/HPC/pages/430407770/The+Basics+Partition+Information+on+Koa for KOA partition info
 
-#SBATCH --partition=sadow # sadow, gpu, shared, kill-shared, exclusive-long
-#SBATCH --account=sadow
+#SBATCH --partition=gpu # sadow, gpu, shared, kill-shared, exclusive-long
+##SBATCH --account=sadow
 ##SBATCH --nodelist=gpu-0008
 
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=6 ## # cores per task
 #SBATCH --mem=48gb ## max amount of memory per node you require
-#SBATCH --time=14-00:00:00 ## time format is DD-HH:MM:SS, 3day max on kill-shared, 7day max on exclusive-long, 14day max on sadow
+#SBATCH --time=3-00:00:00 ## time format is DD-HH:MM:SS, 3day max on kill-shared, 7day max on exclusive-long, 14day max on sadow
 
-#SBATCH --job-name=gp
+#SBATCH --job-name=gp_100
 #SBATCH --output=job.out
 #SBATCH --output=../logs/slurm_output/job-%A.out
 #SBATCH --mail-type=START,END,FAIL
 #SBATCH --mail-user=linneamw@hawaii.edu
 
-# Load python profile, then call python script passing SLURM_ARRAY_TASK_ID as an argument.
+# Load python profile and activate environment
 source ~/profiles/auto.profile
 source activate dipper_detect
 
@@ -32,25 +32,34 @@ source activate dipper_detect
 # python file.py
 
 # Create a for loop to run the script with different arguments
-file_numbers=(3 18 48)
-locs=(500 1750 3000)
-widths=(2 14 26 38 50)
-amps=(-5.0 -4.0 -3.0 -2.0 -1.0)
+widths=(2 4 8 16 32 64 128)
+amps=(-1.5 -1.25 -1.0 -0.75)
 shapes=('gaussian')
 
-for file_number in "${file_numbers[@]}" 
+# Run for each width, amplitude, and shape
+for width in "${widths[@]}" 
 do
-    for loc in "${locs[@]}" 
+    for amp in "${amps[@]}" 
     do
-        for width in "${widths[@]}" 
+        for shape in "${shapes[@]}" 
         do
-            for amp in "${amps[@]}" 
+            # Reset the count
+            count=1
+
+            # Repeat 100 times
+            while [ $count -le 100 ]
             do
-                for shape in "${shapes[@]}" 
-                do
-                    echo "Running file_number: $file_number with anomaly parameters loc: $loc, width: $width, amp: $amp, shape: $shape"
-                    python evaluate_gp.py --file_number $file_number --loc $loc --width $width --amp $amp --shape $shape
-                done
+                echo "Running iteration $count"
+                
+                # Each time, select a random file_number and a random loc
+                file_number=$((1 + RANDOM % 78))
+                loc=$((600 + RANDOM % (3200 - 600 + 1)))
+
+                # Run the script with the selected file_number and anomaly parameters
+                echo "Running file_number: $file_number with anomaly parameters loc: $loc, width: $width, amp: $amp, shape: $shape"
+                python evaluate_gp.py --file_number $file_number --loc $loc --width $width --amp $amp --shape $shape
+
+                ((count++))
             done
         done
     done

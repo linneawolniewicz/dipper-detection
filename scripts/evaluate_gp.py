@@ -5,6 +5,9 @@ import gpytorch
 import torch
 import pandas as pd
 import argparse
+import time
+
+start_time = time.time()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
@@ -59,7 +62,7 @@ which_metric = 'msll' # 'rmse', 'nlpd', msll, or default is 'mll'
 num_anomalies = 3**len(anomaly_locs)
 num_steps = len(x)
 anomalous = np.zeros(num_steps) # 0 means non-anomalous, 1 means anomalous at that time step
-initial_lengthscale = 0.3**2 # If None, no lengtshcale is used (default) and the theta parameter is the identity matrix
+initial_lengthscale = 0.5 # If None, no lengtshcale is used (default) and the theta parameter is the identity matrix
 expansion_param = 2 # how many indices left and right to increase anomaly by
 
 # Train GP model
@@ -106,23 +109,27 @@ for i in range(num_anomalies):
         # Re-fit the GP on non-anomalous data
         model, likelihood, mll = train_gp(x_sub, y_sub, y_err_sub, training_iterations=1, lengthscale=final_lengthscale, device=device)
 
-        # Predict on subset
+        # Predict
         model.eval()
         likelihood.eval()
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
-            observed_pred = likelihood(model(x_sub))
-            pred_mean = observed_pred.mean.cpu().numpy()
-            pred_var = observed_pred.variance.cpu().numpy()
+            # Subset
+            observed_pred_sub = likelihood(model(x_sub))
+            pred_mean_sub = observed_pred.mean.cpu().numpy()
+            
+            # Full
+            observed_pred_full = likelihood(model(x_tensor))
+            pred_mean_full = observed_pred_full.mean.cpu().numpy()
 
         # Calculate metric difference
         old_metric = metric
 
         if which_metric == 'nlpd':
-            metric = gpytorch.metrics.negative_log_predictive_density(observed_pred, y_sub)
+            metric = gpytorch.metrics.negative_log_predictive_density(observed_pred_sub, y_sub)
         elif which_metric == 'msll':
-            metric = gpytorch.metrics.mean_standardized_log_loss(observed_pred, y_sub)
+            metric = gpytorch.metrics.mean_standardized_log_loss(observed_pred_sub, y_sub)
         elif which_metric == 'rmse':
-            metric = np.sqrt(np.mean((pred_mean - y_sub.cpu().numpy())**2))
+            metric = np.sqrt(np.mean((pred_mean_sub - y_sub.cpu().numpy())**2))
         else: # metric == mll
             model.eval()
             likelihood.eval()
@@ -142,7 +149,7 @@ for i in range(num_anomalies):
         print(f"Anomaly index {i} x[i] {x[i]}, left_edge:right_edge {left_edge}:{right_edge}")
 
     # Update anomalous array and remove anomalies from y
-    y[left_edge:right_edge] = pred_mean[left_edge:right_edge]
+    y[left_edge:right_edge] = pred_mean_full[left_edge:right_edge]
     anomalous[left_edge:right_edge] = 1
 
 # Check whether every anomaly_locs was identified in the anomalous array
@@ -150,12 +157,12 @@ identified = np.zeros(len(anomaly_locs))
 flagged_anomalies = np.where(anomalous == 1)
 
 for i in range(len(anomaly_locs)):
-    anomaly = int(anomaly_locs[i])
+    # Define anomaly_range as +/- 1 width of the anomaly
+    anomaly_range = np.arange(int(anomaly_locs[i]) - args.width, int(anomaly_locs[i]) + args.width)
 
-    if np.isin(anomaly, flagged_anomalies):
+    # If at least one index in the anomaly_range is identified, set identified to 1
+    if np.any(np.isin(anomaly_range, flagged_anomalies)):
         identified[i] = 1
-    else:
-        print(f"Anomaly at index {anomaly} was not identified in the anomalous array")
 
 identified_ratio = np.sum(identified) / len(anomaly_locs)
 
@@ -177,12 +184,17 @@ gp_results = pd.DataFrame(results, columns=column_names)
 
 # Write gp_results to results_dir
 results_dir = '../results/'
-results_filename = results_dir + 'gp_varying_anomaly_size_results.csv'
+results_filename = 'gp_vary_size_100_repeats_fixed.csv'
 
 # Append results to results file if it exists, else create it
 try:
-    existing_results = pd.read_csv(results_filename)
+    existing_results = pd.read_csv(results_dir + results_filename)
     gp_results = pd.concat([existing_results, gp_results], axis=0)
-    gp_results.to_csv(results_filename, index=False)
+    gp_results.to_csv(results_dir + results_filename, index=False)
 except FileNotFoundError:
-    gp_results.to_csv(results_filename, index=False)   
+    gp_results.to_csv(results_dir + results_filename, index=False)   
+
+# Get running time
+end_time = time.time()
+run_time = end_time - start_time
+print(f"Total runtime {run_time} \n---\n")

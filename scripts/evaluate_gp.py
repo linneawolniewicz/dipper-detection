@@ -184,7 +184,7 @@ gp_results = pd.DataFrame(results, columns=column_names)
 
 # Write gp_results to results_dir
 results_dir = '../results/'
-results_filename = 'gp_vary_size_100_repeats_fixed.csv'
+results_filename = 'gp_vary_size_100_repeats_3files.csv'
 
 # Append results to results file if it exists, else create it
 try:

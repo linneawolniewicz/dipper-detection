@@ -1,5 +1,7 @@
 __pycache__/
 .ipynb_checkpoints
-logs/
-data/
-results/
+*.fits
+*.gz
+*.out
+*.csv
+*.png

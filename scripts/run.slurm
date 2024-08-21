@@ -52,7 +52,7 @@ do
                 echo "Running iteration $count"
                 
                 # Each time, select a random loc and file_number
-                file_number=$((1 + RANDOM % 78))
+                file_number=$((RANDOM % 77))
                 loc=$((600 + RANDOM % (3200 - 600 + 1)))
 
                 # Run the script with the selected file_number and anomaly parameters

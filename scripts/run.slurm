@@ -11,7 +11,7 @@
 #SBATCH --mem=48gb ## max amount of memory per node you require
 #SBATCH --time=3-00:00:00 ## time format is DD-HH:MM:SS, 3day max on kill-shared, 7day max on exclusive-long, 14day max on sadow
 
-#SBATCH --job-name=gp_100
+#SBATCH --job-name=gp_100_randomlc
 #SBATCH --output=job.out
 #SBATCH --output=../logs/slurm_output/job-%A.out
 #SBATCH --mail-type=START,END,FAIL
@@ -32,14 +32,15 @@ source activate dipper_detect
 # python file.py
 
 # Create a for loop to run the script with different arguments
-widths=(2 4 8 16 24 32 48 64 80 96 112 128 144 160)
-amps=(-1.5 -1.25 -1.0 -0.75)
+widths=(0.9 1.0 1.2 1.4 1.6 1.8 2.0)
+depths=(2.0 1.75 1.5 1.25 1.0 0.75 0.5)
 shapes=('gaussian')
+results_filename='gp_vary_size_100_reframed'
 
 # Run for each width, amplitude, and shape
 for width in "${widths[@]}" 
 do
-    for amp in "${amps[@]}" 
+    for depth in "${depths[@]}" 
     do
         for shape in "${shapes[@]}" 
         do
@@ -51,13 +52,15 @@ do
             do
                 echo "Running iteration $count"
                 
-                # Each time, select a random loc and file_number
-                file_number=$((RANDOM % 77))
+                # Each time, select a random loc
                 loc=$((600 + RANDOM % (3200 - 600 + 1)))
 
+                # Each time, select a random file_number from [0, 77]
+                file_number=$((RANDOM % 78))
+
                 # Run the script with the selected file_number and anomaly parameters
-                echo "Running file_number: $file_number with anomaly parameters loc: $loc, width: $width, amp: $amp, shape: $shape"
-                python evaluate_gp_tmp.py --file_number $file_number --loc $loc --width $width --amp $amp --shape $shape
+                echo "Running file_number: $file_number with anomaly parameters loc: $loc, width_scale: $width, depth_scale: $depth, shape: $shape, and save to $results_filename"
+                python evaluate_gp.py --file_number $file_number --loc $loc --width $width --depth $depth --shape $shape --results_filename $results_filename
 
                 ((count++))
             done

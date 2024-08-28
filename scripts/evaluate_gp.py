@@ -1,6 +1,11 @@
+# add ../src directory to path
+import sys
+sys.path.append('../src')
+
+# imports
 import numpy as np
-from data_utils import *
-from model_utils import *
+from utils import *
+from gp_model import *
 import gpytorch
 import torch
 import pandas as pd
@@ -16,9 +21,10 @@ print("Using device:", device)
 parser = argparse.ArgumentParser()
 parser.add_argument('--file_number', type=int, default=0)
 parser.add_argument('--loc', type=int, default=500)
-parser.add_argument('--width', type=int, default=1)
-parser.add_argument('--amp', type=float, default=-1.)
+parser.add_argument('--width', type=float, default=0.1)
+parser.add_argument('--depth', type=float, default=-1.)
 parser.add_argument('--shape', type=str, default='gaussian')
+parser.add_argument('--results_filename', type=str, default='gp_results')
 args = parser.parse_args()
 
 # Load the data
@@ -31,13 +37,13 @@ y = (y - np.min(y)) / (np.max(y) - np.min(y))
 y_err = y_err / (np.max(y) - np.min(y))
 
 # Inject anomalies
-steps, y, anomaly_locs = inject_anomaly(
+steps, y, anomaly_locs, anomaly_amp, anomaly_fwhm = inject_anomaly(
     y, 
     num_anomalies=1, 
     seed=args.file_number, 
     shapes=[args.shape],
-    anomaly_stdev=args.width,
-    anomaly_amp=args.amp,
+    width_scale=args.width,
+    depth_scale=args.depth,
     anomaly_idx=[args.loc]
 )
 
@@ -152,28 +158,21 @@ for i in range(num_anomalies):
     y[left_edge:right_edge] = pred_mean_full[left_edge:right_edge]
     anomalous[left_edge:right_edge] = 1
 
-# Check whether every anomaly_locs was identified in the anomalous array
-identified = np.zeros(len(anomaly_locs))
+# Check identified anomalies
 flagged_anomalies = np.where(anomalous == 1)
-
-for i in range(len(anomaly_locs)):
-    # Define anomaly_range as +/- 1 width of the anomaly
-    anomaly_range = np.arange(int(anomaly_locs[i]) - args.width, int(anomaly_locs[i]) + args.width)
-
-    # If at least one index in the anomaly_range is identified, set identified to 1
-    if np.any(np.isin(anomaly_range, flagged_anomalies)):
-        identified[i] = 1
-
-identified_ratio = np.sum(identified) / len(anomaly_locs)
+identified, identified_ratio = check_identified_anomalies(anomaly_locs, flagged_anomalies, anomaly_fwhm)
 
 # Put results into a dictionary
-column_names = ['filename', 'amp', 'width_stdev', 'shape', 'location_idx', 'flagged_anomalies', 'identified', 'identified_ratio']
+column_names = ['filename', 'depth_scale', 'width_scale', 'shape', 'anomaly_amp', 'anomaly_fwhm', 
+                'location_idx', 'flagged_anomalies', 'identified', 'identified_ratio']
 results = {
     'filename': filename, 
-    'amp': args.amp, 
-    'width_stdev': args.width, 
+    'depth_scale': args.depth, 
+    'width_scale': args.width, 
     'shape': args.shape,
     'location_idx': args.loc, 
+    'anomaly_amp': anomaly_amp,
+    'anomaly_fwhm': anomaly_fwhm,
     'flagged_anomalies': flagged_anomalies, 
     'identified': identified, 
     'identified_ratio': identified_ratio
@@ -184,15 +183,14 @@ gp_results = pd.DataFrame(results, columns=column_names)
 
 # Write gp_results to results_dir
 results_dir = '../results/'
-results_filename = 'gp_vary_size_100_repeats_3files.csv'
 
 # Append results to results file if it exists, else create it
 try:
-    existing_results = pd.read_csv(results_dir + results_filename)
+    existing_results = pd.read_csv(results_dir + args.results_filename + '.csv')
     gp_results = pd.concat([existing_results, gp_results], axis=0)
-    gp_results.to_csv(results_dir + results_filename, index=False)
+    gp_results.to_csv(results_dir + args.results_filename + '.csv', index=False)
 except FileNotFoundError:
-    gp_results.to_csv(results_dir + results_filename, index=False)   
+    gp_results.to_csv(results_dir + args.results_filename + '.csv', index=False)   
 
 # Get running time
 end_time = time.time()

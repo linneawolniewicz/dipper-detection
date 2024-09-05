@@ -5,16 +5,17 @@ import matplotlib.pyplot as plt
 from gp_model import train_gp
 from utils import check_identified_anomalies
 
+# TODO: make this work when y_err is not provided (i.e. the synthetic lc)
 class GPDetectAnomaly:
     def __init__(
             self, 
             x, 
             y, 
             y_err, 
-            which_metric='mll', 
-            num_anomalies=1,
-            initial_lengthscale=None,
-            expansion_param=1
+            which_metric='mll', # 'nlpd', 'msll', 'rmse', or default is 'mll'
+            num_anomalies=1, # Number of anomalies to detect
+            initial_lengthscale=None, # If None, no lengthscale is used (default) and the theta parameter is the identity matrix
+            expansion_param=1 # how many indices left and right to increase anomaly by
         ):
 
         self.x = x
@@ -27,12 +28,12 @@ class GPDetectAnomaly:
         self.y_err_orig = np.copy(y_err)
 
         # Initialize variables
-        self.which_metric = which_metric # 'nlpd', 'msll', 'rmse', or default is 'mll'
-        self.num_anomalies = num_anomalies # Number of anomalies to detect
+        self.which_metric = which_metric 
+        self.num_anomalies = num_anomalies 
         self.num_steps = len(x)
         self.anomalous = np.zeros(self.num_steps) # 0 means non-anomalous, 1 means anomalous at that time step
-        self.initial_lengthscale = initial_lengthscale # If None, no lengthscale is used (default) and the theta parameter is the identity matrix
-        self.expansion_param = expansion_param # how many indices left and right to increase anomaly by
+        self.initial_lengthscale = initial_lengthscale 
+        self.expansion_param = expansion_param 
 
     def detect_anomaly(self, training_iterations=30, device='cpu', plot=False, anomaly_locs=None, anomaly_fwhm=None):
         '''

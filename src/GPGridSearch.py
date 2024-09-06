@@ -109,6 +109,18 @@ class GPGridSearch:
                 with open(filename, 'a') as f:
                     f.write(f'{start},{end},{metric}\n')
 
+            # Delete all variables to free up memory
+            del model
+            del likelihood
+            del mll
+            del y_pred
+            del f_pred
+            del metric
+            del mask
+            del x_train
+            del y_train
+            del y_err_train
+
         return best_interval, max_metric
 
     

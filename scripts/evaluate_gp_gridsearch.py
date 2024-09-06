@@ -69,7 +69,7 @@ gp_detector = GPGridSearch(
     y,
     y_err,
     which_metric=which_metric,
-    initial_lengthscale=initial_lengthscale,
+    initial_lengthscale=initial_lengthscale
 )
 
 best_interval, max_metric = gp_detector.find_anomalous_interval(device=device, training_iterations=training_iterations, filename=filename)

@@ -45,10 +45,21 @@ class GPGridSearch:
         self.anomaly_intervals = [(i, j) for i in range(self.num_steps)
                                   for j in range(i + min_anomaly_len, min(i + max_anomaly_len, self.num_steps))]
 
-    def find_anomalous_interval(self, device=torch.device("cpu"), training_iterations=10):
+    def find_anomalous_interval(self, device=torch.device("cpu"), training_iterations=10, filename=""):
         # Initialize
         max_metric = -np.inf
         best_interval = None
+
+        if filename == "":
+            save_to_txt = False
+        else:
+            # Create csv file to save results
+            save_to_txt = True
+
+            # write header
+            with open(filename, 'w') as f:
+                f.write('start,end,metric\n')
+
 
         # Iterate over each possible anomaly interval
         for start, end in self.anomaly_intervals:
@@ -92,6 +103,11 @@ class GPGridSearch:
                 best_interval = (start, end)
 
             print(f"Anomaly interval: {start}-{end}, Metric: {metric}")
+
+            # Save results to csv if save_to_csv is True
+            if save_to_txt:
+                with open(filename, 'a') as f:
+                    f.write(f'{start},{end},{metric}\n')
 
         return best_interval, max_metric
 

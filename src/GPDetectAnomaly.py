@@ -179,7 +179,7 @@ class GPDetectAnomaly:
 
         return self.x, self.y, self.anomalous
     
-    def predict_anomaly(self, device='cpu', plot=False, anomaly_locs=None, anomaly_fwhm=None):
+    def predict_anomaly(self, device='cpu', plot=False, save_name=None, anomaly_locs=None, anomaly_fwhm=None):
         # Subset x, y, and y_err
         subset = (self.anomalous == 0)
         x_sub = torch.tensor(self.x[subset], dtype=torch.float32).to(device)
@@ -198,7 +198,7 @@ class GPDetectAnomaly:
             pred_var = observed_pred.variance.cpu().numpy()
 
         # Plot if desired
-        if plot:
+        if plot==True or save_name is not None:
             fig, axs = plt.subplots(2, 1, sharex = True, figsize=(8, 8))
             axs[0].set_title("GP Mean Prediction vs Data")
             axs[0].plot(self.x, pred_mean, "grey", lw=2, label="Prediction on all Data")
@@ -224,7 +224,14 @@ class GPDetectAnomaly:
                     axs[1].axvspan(self.x[anomaly_range[0]], self.x[anomaly_range[-1]], color='gold')
                 axs[1].set_ylim(0, 20 * np.median(np.abs(sigdev[(self.anomalous==0)])))
                 axs[1].legend(loc='upper right')
+
+            if plot:
                 plt.show(block=True)
+
+            if save_name is not None:
+                plt.savefig(save_name)
+
+            plt.close()
 
         # Check identified anomalies if anomaly_locs are provided
         if anomaly_locs is not None:

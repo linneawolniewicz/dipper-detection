@@ -23,36 +23,35 @@ def check_identified_anomalies(anomaly_locs, flagged_anomalies, anomaly_fwhm):
 
 def generate_anomaly(
         num_anomalies, 
-        signal,
+        lightcurve,
         rng,
         shapes=["gaussian", "saw"],
-        width_scale=None,
-        depth_scale=None,
+        period_scale=None, # What ratio of dominant period should be anomaly have
+        snr=None, # What signal to noise ratio should the anomaly have
         locs=None
     ):
 
     # Initialize
-    num_steps = len(signal)
+    num_steps = len(lightcurve)
     time_steps = np.arange(num_steps)
     anomaly = np.zeros(num_steps)
     anomaly_locs = []
 
-    # Create anomaly depth_scale if not given
-    if depth_scale is None:
-        depth_scale = rng.uniform(0.1, 2) # depth of anomaly 
+    # Create anomaly with snr if not given
+    if snr is None:
+        snr = rng.uniform(1, 10) # depth of anomaly 
 
-    # Get anomaly depth from snr of signal
-    signal_mean = np.mean(signal)
-    noise_std = np.std(signal)
-    snr = signal_mean / noise_std
-    anomaly_depth = -1 * depth_scale * snr
+    # Create anomaly of amplitude corresponding to desired snr (using MAD for noise)
+    noise = np.median(np.abs(lightcurve - np.median(lightcurve)))
+    signal = snr * noise
+    anomaly_amp = -1 * signal
 
-    # Create anomaly width_scale if not given
-    if width_scale is None: 
-        width_scale = rng.uniform(0.1, 2) # width of anomaly
+    # Create anomaly period_scale if not given
+    if period_scale is None: 
+        period_scale = rng.uniform(0.1, 2) # period scaling of anomaly
 
     # Create anomaly_width from period of peak in power spectrum
-    freqs, power = periodogram(signal)
+    freqs, power = periodogram(lightcurve)
     peaks, _ = find_peaks(power)
     if len(peaks) == 0:
         print("No peaks found in power spectrum, using shoulder instead")
@@ -65,7 +64,7 @@ def generate_anomaly(
         dominant_peak = peaks[np.argmax(power[peaks])]
         dominant_period = 1 / freqs[dominant_peak]
     
-    anomaly_period = width_scale * dominant_period
+    anomaly_period = period_scale * dominant_period
     anomaly_width = max(anomaly_period / (2 * np.sqrt(2 * np.log(2))), 1) # minimum value of 1. Note this is the sigma of the anomaly (assuming gaussian)
     anomaly_fwhm = 2.355 * anomaly_width # True for gaussian-shaped anomalies
 
@@ -84,17 +83,17 @@ def generate_anomaly(
 
         if shape == "gaussian":
             # Gaussian-shape anomaly at x0 
-            anomaly += anomaly_depth * np.exp(-0.5 * ((time_steps - anomaly_loc) / anomaly_width)**2) 
+            anomaly += anomaly_amp * np.exp(-0.5 * ((time_steps - anomaly_loc) / anomaly_width)**2) 
         elif shape == "saw":
-            # Create anomaly that has a quick dip to anomaly_depth, then a slow rise back to 0 based on anomaly_width
-            anomaly += anomaly_depth * (1 - np.exp(-np.abs(time_steps - anomaly_loc) / anomaly_width))
-            # anomaly += anomaly_depth * (time_steps > anomaly_loc) * np.exp(-0.01 * (time_steps - anomaly_loc))
+            # Create anomaly that has a quick dip to anomaly_amp, then a slow rise back to 0 based on anomaly_width
+            anomaly += anomaly_amp * (1 - np.exp(-np.abs(time_steps - anomaly_loc) / anomaly_width))
+            # anomaly += anomaly_amp * (time_steps > anomaly_loc) * np.exp(-0.01 * (time_steps - anomaly_loc))
         else: 
             raise ValueError(f"Invalid shape {shape} for anomaly.")
 
-    return anomaly, anomaly_locs, anomaly_depth, anomaly_fwhm
+    return anomaly, anomaly_locs, anomaly_amp, anomaly_fwhm
 
-# Simulates a K2-like lightcurve with red-noisy periodic signal with a step, a trend, and an inserted anomaly
+# Simulates a K2-like lightcurve with red-noisy periodic lightcurve with a step, a trend, and an inserted anomaly
 def generate_synthetic_lc(
         num_anomalies=1,
         rednoise_amp=1.0, 
@@ -102,8 +101,8 @@ def generate_synthetic_lc(
         num_steps=1000, 
         seed=48,
         shapes=["gaussian", "saw"],
-        width_scale=None,
-        depth_scale=None,
+        period_scale=None,
+        snr=None,
         anomaly_idx=None
     ):
 
@@ -111,18 +110,18 @@ def generate_synthetic_lc(
     x = np.arange(num_steps)
     rng = np.random.default_rng(seed=seed)
 
-    # Synthetic signal 
-    period = 175 + 50 * rng.random() # randomly chosen period of signal
+    # Synthetic lightcurve 
+    period = 175 + 50 * rng.random() # randomly chosen period of lightcurve
     phase = 2 * np.pi * rng.random() # randomly chosen phase
     amp = 0.9 * rng.random() # randomly chosen amplitude
-    signal = amp * np.cos(2 * np.pi * x / period + phase)
+    lightcurve = amp * np.cos(2 * np.pi * x / period + phase)
 
     # White noise 
     whitenoise = whitenoise_amp * rng.random(num_steps)
 
     # Red noise
     redscale = rng.integers(5, 15) # correlation time scale of red noise
-    rednoise = np.convolve(rng.random(2 * num_steps), scipy.signal.windows.gaussian(int(4 * redscale), redscale))
+    rednoise = np.convolve(rng.random(2 * num_steps), scipy.lightcurve.windows.gaussian(int(4 * redscale), redscale))
     x1 = int(len(rednoise)/2) - int(num_steps/2)
     x2 = x1 + num_steps
     rednoise = rednoise[x1:x2]
@@ -139,10 +138,10 @@ def generate_synthetic_lc(
     trend = slope * (x - num_steps/2)
 
     # Inject anomalies
-    anomaly, anomaly_locs, anomaly_amp, anomaly_fwhm = generate_anomaly(num_anomalies, rednoise, rng, shapes, width_scale, depth_scale, anomaly_idx)
+    anomaly, anomaly_locs, anomaly_amp, anomaly_fwhm = generate_anomaly(num_anomalies, rednoise, rng, shapes, period_scale, snr, anomaly_idx)
 
     # Combine
-    y = signal + anomaly + whitenoise + rednoise + step + trend
+    y = lightcurve + anomaly + whitenoise + rednoise + step + trend
     y = y - np.mean(y)
 
     return x, y, anomaly_locs, anomaly_amp, anomaly_fwhm
@@ -153,8 +152,8 @@ def inject_anomaly(
         num_anomalies=1, 
         seed=48, 
         shapes=["gaussian", "saw"],
-        width_scale=None,
-        depth_scale=None,
+        period_scale=None,
+        snr=None,
         anomaly_idx=None
     ):
 
@@ -163,7 +162,7 @@ def inject_anomaly(
     rng = np.random.default_rng(seed=seed)
     
     # Inject anomalies
-    anomaly, anomaly_locs, anomaly_amp, anomaly_fwhm = generate_anomaly(num_anomalies, y, rng, shapes, width_scale, depth_scale, anomaly_idx)
+    anomaly, anomaly_locs, anomaly_amp, anomaly_fwhm = generate_anomaly(num_anomalies, y, rng, shapes, period_scale, snr, anomaly_idx)
 
     y = y + anomaly
 

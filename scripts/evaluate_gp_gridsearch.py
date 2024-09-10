@@ -11,6 +11,11 @@ from GPGridSearch import GPGridSearch
 import gpytorch
 import torch
 import argparse
+import time
+import os
+
+# Start time
+start_time = time.time()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
@@ -18,13 +23,13 @@ print("Using device:", device)
 # Parse command line arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('--file_number', type=int, default=0)
+parser.add_argument('--save_dir', type=str, default="grid_search")
 args = parser.parse_args()
 
 # Data and anomaly parameters
 shape = "gaussian"
-width_scale = 1.6
-depth_scale = 0.5
-loc = 2000
+period_scale = 0.5
+snr = 0.5
 
 # Load the data
 data_dir = '../data/k2/'
@@ -35,15 +40,14 @@ x, y, y_err = load_k2_data(data_dir + data_filename)
 y = (y - np.min(y)) / (np.max(y) - np.min(y))
 y_err = y_err / (np.max(y) - np.min(y))
 
-# Inject anomalies
+# Inject anomalies at a random location
 steps, y, anomaly_locs, anomaly_amp, anomaly_fwhm = inject_anomaly(
     y, 
     num_anomalies=1, 
     seed=args.file_number, 
     shapes=[shape],
-    width_scale=width_scale,
-    depth_scale=depth_scale,
-    anomaly_idx=[loc]
+    period_scale=period_scale,
+    snr=snr
 )
 
 # Standardize data to have mean 0 and std of 1
@@ -56,13 +60,19 @@ y_err = y_err / std_y
 print("Anomaly locations:")
 print(anomaly_locs)
 for i in anomaly_locs: print(x[int(i)])
+print(f"Anomaly period_scale {period_scale}, snr {snr}, fwhm {anomaly_fwhm}, and amp {anomaly_amp}")
 
 # Hyperparameters for grid search
 which_metric = 'mll'
 initial_lengthscale = 0.5
-training_iterations = 30
+training_iterations = 50
 plot = False
-filename  = f'../results/grid_search/gp_initial_{args.file_number}.txt'
+results_dir = "../results/"
+save_file = results_dir + args.save_dir + f"/file_number_{args.file_number}.txt"
+
+# If results_dir + args.save_dir doesn't exist, create it
+if not os.path.exists(results_dir + args.save_dir + "/"):
+    os.makedirs(results_dir + args.save_dir + "/")
 
 gp_detector = GPGridSearch(
     x,
@@ -72,5 +82,14 @@ gp_detector = GPGridSearch(
     initial_lengthscale=initial_lengthscale
 )
 
-best_interval, max_metric = gp_detector.find_anomalous_interval(device=device, training_iterations=training_iterations, filename=filename)
-print(f"Best interval: {best_interval}, Max metric: {max_metric}, saved to {filename}")
+best_interval, max_metric = gp_detector.find_anomalous_interval(
+    device=device, 
+    training_iterations=training_iterations, 
+    filename=save_file
+)
+print(f"Best interval: {best_interval}, Max metric: {max_metric}, saved to {save_file}")
+
+# Get running time
+end_time = time.time()
+run_time = end_time - start_time
+print(f"Total runtime {run_time} \n---\n")

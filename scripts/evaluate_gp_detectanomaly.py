@@ -44,8 +44,8 @@ steps, y, anomaly_locs, anomaly_amp, anomaly_fwhm = inject_anomaly(
     num_anomalies=1, 
     seed=args.file_number, 
     shapes=[args.shape],
-    width_scale=args.width,
-    depth_scale=args.depth,
+    period_scale=args.width,
+    snr=args.depth,
     anomaly_idx=[args.loc]
 )
 
@@ -60,7 +60,7 @@ which_metric = 'msll' # 'rmse', 'nlpd', msll, or default is 'mll'
 num_anomalies = 3**len(anomaly_locs)
 initial_lengthscale = 0.5 # If None, no lengtshcale is used (default) and the theta parameter is the identity matrix
 expansion_param = 2 # how many indices left and right to increase anomaly by
-training_iterations = 30
+training_iterations = 50
 plot = False
 
 gp_detector = GPDetectAnomaly(
@@ -86,12 +86,12 @@ flagged_anomalies = np.where(anomalous == 1)
 identified, identified_ratio = check_identified_anomalies(anomaly_locs, flagged_anomalies, anomaly_fwhm)
 
 # Put results into a dictionary
-column_names = ['filename', 'depth_scale', 'width_scale', 'shape', 'anomaly_amp', 'anomaly_fwhm', 
+column_names = ['filename', 'snr', 'period_scale', 'shape', 'anomaly_amp', 'anomaly_fwhm', 
                 'location_idx', 'flagged_anomalies', 'identified', 'identified_ratio']
 results = {
     'filename': filename, 
-    'depth_scale': args.depth, 
-    'width_scale': args.width, 
+    'snr': args.depth, 
+    'period_scale': args.width, 
     'shape': args.shape,
     'location_idx': args.loc, 
     'anomaly_amp': anomaly_amp,

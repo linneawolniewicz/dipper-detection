@@ -4,6 +4,7 @@ import gpytorch
 import matplotlib.pyplot as plt
 from gp_model import train_gp
 from utils import check_identified_anomalies
+import gc
 
 # Create a class that takes in a lightcurve (x, y, optionally y_err), and computes all possible start and end points of an anomaly.
 # It then, for each start and end point (anomalous interval), trains a GP model on the non-anomalous data, and computes the log likelihood of the anomalous interval.
@@ -120,6 +121,8 @@ class GPGridSearch:
             del x_train
             del y_train
             del y_err_train
+            torch.cuda.empty_cache()
+            gc.collect()
 
         return best_interval, max_metric
 

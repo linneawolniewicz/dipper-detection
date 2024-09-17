@@ -32,7 +32,7 @@ source activate dipper_detect
 # jupyter nbconvert file.ipynb --to python
 # python file.py
 
-save_dir='grid_search_snr5_period01'
+save_dir='grid_search_snr2_period02'
 
 echo This is job $SLURM_ARRAY_JOB_ID task $SLURM_ARRAY_TASK_ID running on $HOSTNAME
 echo "Running file_number: $SLURM_ARRAY_TASK_ID"

@@ -24,12 +24,13 @@ print("Using device:", device)
 parser = argparse.ArgumentParser()
 parser.add_argument('--file_number', type=int, default=0)
 parser.add_argument('--save_dir', type=str, default="grid_search")
+parser.add_argument
 args = parser.parse_args()
 
 # Data and anomaly parameters
 shape = "gaussian"
-period_scale = 0.5
-snr = 0.5
+period_scale = 0.2
+snr = 2
 
 # Load the data
 data_dir = '../data/k2/'
@@ -57,10 +58,11 @@ y = (y - mean_y) / std_y
 y_err = y_err / std_y
 
 # Print anomaly_locs, both indices and x[i]
+print("\nFile number:", args.file_number)
 print("Anomaly locations:")
 print(anomaly_locs)
 for i in anomaly_locs: print(x[int(i)])
-print(f"Anomaly period_scale {period_scale}, snr {snr}, fwhm {anomaly_fwhm}, and amp {anomaly_amp}")
+print(f"Anomaly period_scale {period_scale}, snr {snr}, fwhm {anomaly_fwhm}, and amp {anomaly_amp}\n")
 
 # Hyperparameters for grid search
 which_metric = 'mll'

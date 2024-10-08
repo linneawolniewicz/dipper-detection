@@ -6,6 +6,7 @@ sys.path.append('../src')
 import numpy as np
 from utils import *
 from GPDetectAnomaly import GPDetectAnomaly
+from astropy.io import fits
 import gpytorch
 import torch
 import pandas as pd
@@ -26,13 +27,30 @@ parser.add_argument('--loc', type=int, default=500)
 parser.add_argument('--width', type=float, default=0.1)
 parser.add_argument('--depth', type=float, default=-1.)
 parser.add_argument('--shape', type=str, default='gaussian')
+parser.add_argument('--min_contiguous', type=int, default=1)
+parser.add_argument('--detection_range', type=int, default=100)
 parser.add_argument('--results_filename', type=str, default='gp_results')
+parser.add_argument('--whitenoise', type=int, default=0)
 args = parser.parse_args()
 
 # Load the data
 data_dir = '../data/k2/'
 filename = f'k2_{args.file_number}.fits'
-x, y, y_err = load_k2_data(data_dir + filename)
+
+# If whitenoise is 1, load x, y, and y_err from '../data/whitenoise.fits'
+if args.whitenoise == 1:
+    hdu = fits.open('../data/whitenoise.fits')
+    x = hdu[0].data[0]
+    y = hdu[0].data[1]
+    y_err = hdu[0].data[2]
+
+    # Convert to native byte order
+    x = x.byteswap().newbyteorder()
+    y = y.byteswap().newbyteorder()
+    y_err = y_err.byteswap().newbyteorder()
+
+else:
+    x, y, y_err = load_k2_data(data_dir + filename)
 
 # Scale data to be between 0 and 1
 y = (y - np.min(y)) / (np.max(y) - np.min(y))
@@ -56,10 +74,10 @@ y = (y - mean_y) / std_y
 y_err = y_err / std_y
 
 # Hyperparameters
-which_metric = 'msll' # 'rmse', 'nlpd', msll, or default is 'mll'
+which_metric = 'mll' # 'rmse', 'nlpd', msll, or default is 'mll'
 num_anomalies = 3**len(anomaly_locs)
-initial_lengthscale = 0.5 # If None, no lengtshcale is used (default) and the theta parameter is the identity matrix
-expansion_param = 2 # how many indices left and right to increase anomaly by
+initial_lengthscale = 0.7 # If None, no lengthscale is used (default) and the theta parameter is the identity matrix
+expansion_param = 3 # how many indices left and right to increase anomaly by
 training_iterations = 50
 plot = False
 
@@ -73,21 +91,41 @@ gp_detector = GPDetectAnomaly(
     expansion_param=expansion_param,
 )
 
-x, y, anomalous = gp_detector.detect_anomaly(
+gp_detector.detect_anomaly(
     training_iterations=training_iterations, 
     plot=plot,
     device=device,
     anomaly_locs=anomaly_locs,
-    anomaly_fwhm=anomaly_fwhm
+    detection_range=args.detection_range
 )
 
 # Check identified anomalies
-flagged_anomalies = np.where(anomalous == 1)
-identified, identified_ratio = check_identified_anomalies(anomaly_locs, flagged_anomalies, anomaly_fwhm)
+identified, identified_ratio = check_identified_anomalies(
+    anomaly_locs, 
+    gp_detector.anomalous, 
+    args.detection_range,
+    args.min_contiguous
+)
+
+print(f"Identified {identified} out of {len(anomaly_locs)} anomalies")
+flagged_anomalies = np.where(gp_detector.anomalous == 1)
 
 # Put results into a dictionary
-column_names = ['filename', 'snr', 'period_scale', 'shape', 'anomaly_amp', 'anomaly_fwhm', 
-                'location_idx', 'flagged_anomalies', 'identified', 'identified_ratio']
+column_names = [
+    'filename', 
+    'snr', 
+    'period_scale', 
+    'shape', 
+    'location_idx', 
+    'anomaly_amp', 
+    'anomaly_fwhm', 
+    'flagged_anomalies', 
+    'detection_range', 
+    'min_contiguous', 
+    'identified', 
+    'identified_ratio'
+]
+
 results = {
     'filename': filename, 
     'snr': args.depth, 
@@ -96,25 +134,32 @@ results = {
     'location_idx': args.loc, 
     'anomaly_amp': anomaly_amp,
     'anomaly_fwhm': anomaly_fwhm,
-    'flagged_anomalies': flagged_anomalies, 
-    'identified': identified, 
+    'flagged_anomalies': str(flagged_anomalies), 
+    'detection_range': args.detection_range,
+    'min_contiguous': args.min_contiguous,
+    'identified': str(identified), 
     'identified_ratio': identified_ratio
 }
 
 # Convert results to a dataframe
-gp_results = pd.DataFrame(results, columns=column_names)
+gp_results = pd.DataFrame([results], columns=column_names)
 
 # Write gp_results to results_dir
 results_dir = '../results/'
+if args.whitenoise == 1:
+    final_filename = results_dir + args.results_filename + '/whitenoise.csv'
+else:
+    final_filename = results_dir + args.results_filename + '/lc_' + str(args.file_number) + '.csv'
+print(f"Writing results to {final_filename}")
 
 # Append results to results file if it exists, else create it
 try:
-    existing_results = pd.read_csv(results_dir + args.results_filename + '.csv')
+    existing_results = pd.read_csv(final_filename)
     gp_results = pd.concat([existing_results, gp_results], axis=0)
-    gp_results.to_csv(results_dir + args.results_filename + '.csv', index=False)
+    gp_results.to_csv(final_filename, index=False)
 
 except FileNotFoundError:
-    gp_results.to_csv(results_dir + args.results_filename + '.csv', index=False)   
+    gp_results.to_csv(final_filename, index=False)   
 
 # Get running time
 end_time = time.time()

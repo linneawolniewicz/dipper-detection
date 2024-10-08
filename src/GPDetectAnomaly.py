@@ -35,7 +35,14 @@ class GPDetectAnomaly:
         self.initial_lengthscale = initial_lengthscale 
         self.expansion_param = expansion_param 
 
-    def detect_anomaly(self, training_iterations=30, device='cpu', plot=False, anomaly_locs=None, anomaly_fwhm=None):
+    def detect_anomaly(
+            self, 
+            training_iterations=30, 
+            device='cpu', 
+            plot=False, 
+            anomaly_locs=None,
+            detection_range=None,
+        ):
         '''
         Method:
             1. Perform GP regression on the timeseries.
@@ -98,12 +105,12 @@ class GPDetectAnomaly:
                 if anomaly_locs is not None:
                     # Plot the anomaly_range in axs[0]
                     for i in range(len(anomaly_locs)):
-                        anomaly_range = np.arange(int(anomaly_locs[i]) - int(anomaly_fwhm), int(anomaly_locs[i]) + int(anomaly_fwhm))
+                        anomaly_range = np.arange(int(anomaly_locs[i]) - int(detection_range), int(anomaly_locs[i]) + int(detection_range))
                         axs[0].axvspan(self.x[anomaly_range[0]], self.x[anomaly_range[-1]], color='gold')
 
                     # Plot the anomaly_range in axs[1]
                     for i in range(len(anomaly_locs)):
-                        anomaly_range = np.arange(int(anomaly_locs[i]) - int(anomaly_fwhm), int(anomaly_locs[i]) + int(anomaly_fwhm))
+                        anomaly_range = np.arange(int(anomaly_locs[i]) - int(detection_range), int(anomaly_locs[i]) + int(detection_range))
                         axs[1].axvspan(self.x[anomaly_range[0]], self.x[anomaly_range[-1]], color='gold')
 
                 # Plot the index of the new anomaly
@@ -175,11 +182,17 @@ class GPDetectAnomaly:
             # Update anomalous array and remove anomalies from y
             self.y[left_edge:right_edge] = pred_mean_full[left_edge:right_edge]
             self.anomalous[left_edge:right_edge] = 1
-            print(f"Anomalous edges = {left_edge}:{right_edge}, and anomalous[left_edge:right_edge] = {self.anomalous[left_edge:right_edge]}")
-
-        return self.x, self.y, self.anomalous
+            print(f"Anomalous edges = {left_edge}:{right_edge}")
     
-    def predict_anomaly(self, device='cpu', plot=False, save_name=None, anomaly_locs=None, anomaly_fwhm=None):
+    def predict_anomaly(
+            self, 
+            device='cpu', 
+            plot=False, 
+            save_name=None, 
+            anomaly_locs=None, 
+            min_contiguous=1,
+            detection_range=None
+        ):
         # Subset x, y, and y_err
         subset = (self.anomalous == 0)
         x_sub = torch.tensor(self.x[subset], dtype=torch.float32).to(device)
@@ -199,31 +212,19 @@ class GPDetectAnomaly:
 
         # Plot if desired
         if plot==True or save_name is not None:
-            fig, axs = plt.subplots(2, 1, sharex = True, figsize=(8, 8))
-            axs[0].set_title("GP Mean Prediction vs Data")
-            axs[0].plot(self.x, pred_mean, "grey", lw=2, label="Prediction on all Data")
-            axs[0].plot(x_sub.cpu().numpy(), y_sub.cpu().numpy(), '.k', markersize=2, label="Flagged non-anomalous Data")
-            axs[0].set_ylim(np.min(self.y_orig), np.max(self.y_orig))
-            axs[0].plot(self.x_orig[(self.anomalous==1)], self.y_orig[(self.anomalous==1)], '.r', markersize=2, label="Flagged anomalous Data")
-
-            sigdev = (pred_mean - self.y_orig) / self.y_err_orig
-            axs[1].set_title("Significance of GP Deviation from Original Data")
-            axs[1].plot(self.x[(self.anomalous==0)], np.abs(sigdev[(self.anomalous==0)]), '.k', markersize=2, label="Flagged non-anomalous Data")
-            axs[1].plot(self.x[(self.anomalous==1)], np.abs(sigdev[(self.anomalous==1)]), '.r', markersize=2, label="Flagged anomalous Data")
+            fig, axs = plt.subplots()
+            axs.set_title("GP Mean Prediction vs Data")
+            axs.plot(self.x, pred_mean, "grey", lw=2, label="Prediction on all Data")
+            axs.plot(x_sub.cpu().numpy(), y_sub.cpu().numpy(), '.k', markersize=2, label="Flagged non-anomalous Data")
+            axs.set_ylim(np.min(self.y_orig), np.max(self.y_orig))
+            axs.plot(self.x_orig[(self.anomalous==1)], self.y_orig[(self.anomalous==1)], '.r', markersize=2, label="Flagged anomalous Data")
             
             if anomaly_locs is not None:
-                # Plot the anomaly_range in axs[0]
+                # Plot the anomaly_range
                 for i in range(len(anomaly_locs)):
-                    anomaly_range = np.arange(int(anomaly_locs[i]) - int(anomaly_fwhm), int(anomaly_locs[i]) + int(anomaly_fwhm))
-                    axs[0].axvspan(self.x[anomaly_range[0]], self.x[anomaly_range[-1]], color='gold')
-                axs[0].legend(loc='upper right')
-
-                # Plot the anomaly region in axs[1]
-                for i in range(len(anomaly_locs)):
-                    anomaly_range = np.arange(int(anomaly_locs[i]) - int(anomaly_fwhm), int(anomaly_locs[i]) + int(anomaly_fwhm))
-                    axs[1].axvspan(self.x[anomaly_range[0]], self.x[anomaly_range[-1]], color='gold')
-                axs[1].set_ylim(0, 20 * np.median(np.abs(sigdev[(self.anomalous==0)])))
-                axs[1].legend(loc='upper right')
+                    anomaly_range = np.arange(int(anomaly_locs[i]) - int(detection_range), int(anomaly_locs[i]) + int(detection_range))
+                    axs.axvspan(self.x[anomaly_range[0]], self.x[anomaly_range[-1]], color='gold')
+                axs.legend(loc='upper right')
 
             if plot:
                 plt.show(block=True)
@@ -235,12 +236,13 @@ class GPDetectAnomaly:
 
         # Check identified anomalies if anomaly_locs are provided
         if anomaly_locs is not None:
-            flagged_anomalies = np.where(self.anomalous == 1)
-            identified, identified_ratio = check_identified_anomalies(anomaly_locs, flagged_anomalies, anomaly_fwhm)
+            identified, identified_ratio = check_identified_anomalies(
+                anomaly_locs, 
+                self.anomalous, 
+                detection_range,
+                min_contiguous
+            )
 
             print(f"Injected anomaly centers: {anomaly_locs}")
             print(f"Anomalies identified: {identified}")
             print(f"Ratio of anomalies identified: {identified_ratio}")
-            print(f"Flagged anomalies: {flagged_anomalies}")
-
-        return self.x, self.y, self.anomalous

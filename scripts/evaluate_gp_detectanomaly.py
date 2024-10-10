@@ -1,11 +1,8 @@
-# add ../src directory to path
-import sys
-sys.path.append('../src')
-
 # imports
 import numpy as np
-from utils import *
-from GPDetectAnomaly import GPDetectAnomaly
+from dipper.model_utils.utils import *
+from dipper.data_utils.utils import *
+from dipper.model_utils.GPDetectAnomaly import GPDetectAnomaly
 from astropy.io import fits
 import gpytorch
 import torch

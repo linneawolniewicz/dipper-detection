@@ -17,7 +17,7 @@ dependencies:
   - brotli-python=1.0.9=py312h6a678d5_8
   - bzip2=1.0.8=h5eee18b_6
   - ca-certificates=2024.6.2=hbcca054_0
-  - certifi=2024.6.2=py312h06a4308_0
+  - certifi=2024.6.2=pyhd8ed1ab_0
   - charset-normalizer=2.0.4=pyhd3eb1b0_0
   - colorama=0.4.6=pyhd8ed1ab_0
   - colorlog=6.8.2=py312h7900ff3_0
@@ -138,9 +138,10 @@ dependencies:
   - numpy-base=1.26.4=py312h0da6c21_0
   - openh264=2.1.1=h4ff587b_0
   - openjpeg=2.4.0=h3ad879b_0
-  - openssl=3.3.1=h4ab18f5_0
+  - openssl=3.3.1=h4ab18f5_1
   - optuna=3.6.1=pyhd8ed1ab_0
   - packaging=24.0=pyhd8ed1ab_0
+  - pandas=2.2.2=py312h1d6d2e6_1
   - parso=0.8.3=pyhd3eb1b0_0
   - pcre2=10.42=hebb0a14_1
   - pexpect=4.8.0=pyhd3eb1b0_3
@@ -161,11 +162,13 @@ dependencies:
   - pysocks=1.7.1=py312h06a4308_0
   - python=3.12.2=hab00c5b_0_cpython
   - python-dateutil=2.9.0post0=py312h06a4308_2
+  - python-tzdata=2024.1=pyhd8ed1ab_0
   - python_abi=3.12=4_cp312
   - pytorch=2.3.1=py3.12_cuda11.8_cudnn8.7.0_0
   - pytorch-cuda=11.8=h7e8668a_5
   - pytorch-lightning=2.2.2=pyhd8ed1ab_0
   - pytorch-mutex=1.0=cuda
+  - pytz=2024.1=pyhd8ed1ab_0
   - pyyaml=6.0.1=py312h5eee18b_0
   - pyzmq=25.1.2=py312h6a678d5_0
   - qt-main=5.15.2=h53bd1ea_10

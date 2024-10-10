@@ -1,13 +1,10 @@
-# add ../src directory to path
-import sys
-sys.path.append('../src')
-
 # imports
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
-from utils import *
-from GPGridSearch import GPGridSearch
+from dipper.model_utils.utils import *
+from dipper.data_utils.utils import *
+from dipper.model_utils.GPGridSearch import GPGridSearch
 import gpytorch
 import torch
 import argparse

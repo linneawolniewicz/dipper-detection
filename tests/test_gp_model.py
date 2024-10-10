@@ -1,4 +1,4 @@
-from src.GPDetectAnomaly import *
+from dipper.model_utils.GPDetectAnomaly import *
 import unittest
 import numpy as np
 

@@ -2,8 +2,8 @@ import numpy as np
 import torch
 import gpytorch
 import matplotlib.pyplot as plt
-from gp_model import train_gp
-from utils import check_identified_anomalies
+from .gp_model import train_gp
+from .utils import check_identified_anomalies
 
 # TODO: make this work when y_err is not provided (i.e. the synthetic lc)
 class GPDetectAnomaly:

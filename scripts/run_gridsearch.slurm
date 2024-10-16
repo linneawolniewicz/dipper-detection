@@ -6,13 +6,13 @@
 ##SBATCH --account=sadow
 ##SBATCH --nodelist=gpu-0008
 
-#SBATCH --array=3,18,48
+#SBATCH --array=17,18,27,28,44,3,9,29,43,48,70
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=6 ## # cores per task
-#SBATCH --mem=192gb ## max amount of memory per node you require
+#SBATCH --mem=24gb ## max amount of memory per node you require
 #SBATCH --time=3-00:00:00 ## time format is DD-HH:MM:SS, 3day max on kill-shared, 7day max on exclusive-long, 14day max on sadow
 
-#SBATCH --job-name=gp_grid_search
+#SBATCH --job-name=gp_grid
 #SBATCH --output=job.out
 #SBATCH --output=../logs/slurm_output/job-%A.out
 #SBATCH --mail-type=START,END,FAIL
@@ -32,10 +32,40 @@ source activate dipper_detect
 # jupyter nbconvert file.ipynb --to python
 # python file.py
 
-save_dir='grid_search_snr2_period02'
-
 echo This is job $SLURM_ARRAY_JOB_ID task $SLURM_ARRAY_TASK_ID running on $HOSTNAME
-echo "Running file_number: $SLURM_ARRAY_TASK_ID"
-python evaluate_gp_gridsearch.py --file_number $SLURM_ARRAY_TASK_ID --save_dir $save_dir
+period_scales=(0.001 0.003 0.007 0.017 0.044 0.114 0.293 0.755 1.945 5.012) 
+snrs=(5 4 3 2 1)
+shape='gaussian'
+save_dir='grid_search_multiple_loc'
+window_slide_step=50
+window_size_step=100
+assume_independent=1 # 1=True, 0=False
+which_metric='mll'
+min_contiguous=10
+detection_range=50
+file_number=$SLURM_ARRAY_TASK_ID # Each array job gets a single file_number based on the task ID
+whitenoise=0 # if 1, test on whitenoise. Else, test on real k2 files
 
-# NOTE: this can only run with 216 gb.
+for period_scale in "${period_scales[@]}"
+do
+    for snr in "${snrs[@]}" 
+    do
+        # Reset the count
+        count=1
+
+        # Repeat 30 times
+        while [ $count -le 30 ]
+        do
+            echo "Running iteration $count"
+            
+            # Each time, select a random loc
+            loc=$((600 + RANDOM % (3200 - 600 + 1)))
+            echo "Running grid search on file $file_number with anomaly parameters loc: $loc, period_scale: $period_scale, and snr: $snr"
+            python evaluate_gp_gridsearch.py --file_number $file_number --save_dir $save_dir --period_scale $period_scale --snr $snr --loc $loc --shape $shape --window_slide_step $window_slide_step --window_size_step $window_size_step --assume_independent $assume_independent --which_metric $which_metric --min_contiguous $min_contiguous --detection_range $detection_range --whitenoise $whitenoise
+        
+            ((count++))
+        done
+    done
+done
+
+# NOTE: this can only run with large amounts of memory

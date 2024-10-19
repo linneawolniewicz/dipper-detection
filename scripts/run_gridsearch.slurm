@@ -6,10 +6,10 @@
 ##SBATCH --account=sadow
 ##SBATCH --nodelist=gpu-0008
 
-#SBATCH --array=17,18,27,28,44,3,9,29,43,48,70
+#SBATCH --array=3,9,17,18,27,28,29,43,44,48,70
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=6 ## # cores per task
-#SBATCH --mem=24gb ## max amount of memory per node you require
+#SBATCH --cpus-per-task=3 ## # cores per task
+#SBATCH --mem=18gb ## max amount of memory per node you require
 #SBATCH --time=3-00:00:00 ## time format is DD-HH:MM:SS, 3day max on kill-shared, 7day max on exclusive-long, 14day max on sadow
 
 #SBATCH --job-name=gp_grid
@@ -33,18 +33,19 @@ source activate dipper_detect
 # python file.py
 
 echo This is job $SLURM_ARRAY_JOB_ID task $SLURM_ARRAY_TASK_ID running on $HOSTNAME
-period_scales=(0.001 0.003 0.007 0.017 0.044 0.114 0.293 0.755 1.945 5.012) 
-snrs=(5 4 3 2 1)
+period_scales=(0.001 0.005 0.030 0.166 0.910 5.000)
+depths=(5 2.5 1)
 shape='gaussian'
 save_dir='grid_search_multiple_loc'
-window_slide_step=50
-window_size_step=100
+window_slide_step=20
+window_size_step=60
 assume_independent=1 # 1=True, 0=False
 which_metric='mll'
 min_contiguous=10
 detection_range=50
 file_number=$SLURM_ARRAY_TASK_ID # Each array job gets a single file_number based on the task ID
 whitenoise=0 # if 1, test on whitenoise. Else, test on real k2 files
+num_repeats=10
 
 for period_scale in "${period_scales[@]}"
 do
@@ -53,8 +54,14 @@ do
         # Reset the count
         count=1
 
-        # Repeat 30 times
-        while [ $count -le 30 ]
+        # if period_scale = 0.001 and snr = 5, skip
+        if [ $period_scale = 0.001 ] && [ $snr = 5 ]
+        then
+            count=10
+        fi
+
+        # Repeat num_repeats times
+        while [ $count -le $num_repeats ]
         do
             echo "Running iteration $count"
             

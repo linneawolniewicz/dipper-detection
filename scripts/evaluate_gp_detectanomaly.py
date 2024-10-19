@@ -17,12 +17,12 @@ start_time = time.time()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
-# Parse file_number, loc, width, amp, and shape from bash script
+# Parse file_number, loc, period_scale, amp, and shape from bash script
 parser = argparse.ArgumentParser()
 parser.add_argument('--file_number', type=int, default=0)
 parser.add_argument('--loc', type=int, default=500)
-parser.add_argument('--width', type=float, default=0.1)
-parser.add_argument('--depth', type=float, default=-1.)
+parser.add_argument('--period_scale', type=float, default=0.1)
+parser.add_argument('--snr', type=float, default=-1.)
 parser.add_argument('--shape', type=str, default='gaussian')
 parser.add_argument('--min_contiguous', type=int, default=1)
 parser.add_argument('--detection_range', type=int, default=100)
@@ -59,8 +59,8 @@ steps, y, anomaly_locs, anomaly_amp, anomaly_fwhm = inject_anomaly(
     num_anomalies=1, 
     seed=args.file_number, 
     shapes=[args.shape],
-    period_scale=args.width,
-    snr=args.depth,
+    period_scale=args.period_scale,
+    snr=args.snr,
     anomaly_idx=[args.loc]
 )
 
@@ -125,8 +125,8 @@ column_names = [
 
 results = {
     'filename': filename, 
-    'snr': args.depth, 
-    'period_scale': args.width, 
+    'snr': args.snr, 
+    'period_scale': args.period_scale, 
     'shape': args.shape,
     'location_idx': args.loc, 
     'anomaly_amp': anomaly_amp,

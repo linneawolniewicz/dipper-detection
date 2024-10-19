@@ -68,11 +68,13 @@ class GPGridSearch:
         for start in range(0, self.num_steps - min_anomaly_len, window_slide_step):
             for end in range(start + min_anomaly_len, min(start + max_anomaly_len, self.num_steps), window_size_step):
                 self.intervals.append((start, end))
+        
+        self.mean_metrics = []
 
     def find_anomalous_interval(self, device=torch.device("cpu"), training_iterations=10, filename="", silent=True):
         # Initialize
-        min_metric = np.inf
-        best_interval = None
+        self.min_metric = np.inf
+        self.best_interval = None
 
         if filename == "":
             save_to_txt = False
@@ -136,11 +138,12 @@ class GPGridSearch:
                 metric_sum += metric
 
             metric_mean = metric_sum / (end - start)
+            self.mean_metrics.append(metric_mean)
 
             # Update best interval
-            if metric_mean < min_metric:
-                min_metric = metric_mean
-                best_interval = (start, end)
+            if metric_mean < self.min_metric:
+                self.min_metric = metric_mean
+                self.best_interval = (start, end)
 
             if not silent:
                 print(f"Anomaly interval: {start}-{end}, mean metric over the interval: {metric_mean}")
@@ -164,8 +167,5 @@ class GPGridSearch:
             del y_err_train
             torch.cuda.empty_cache()
             gc.collect()
-
-        self.best_interval = best_interval
-        self.min_metric = min_metric
 
     

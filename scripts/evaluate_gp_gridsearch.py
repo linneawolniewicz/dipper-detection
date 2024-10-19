@@ -99,12 +99,20 @@ gp_detector = GPGridSearch(
 gp_detector.find_anomalous_interval(
     device=device, 
     training_iterations=training_iterations,
-    silent=False
+    silent=True
 )
+
+# Find the 3 lowest mean_metric values and their related intervals
+sorted_intervals = sorted(zip(gp_detector.mean_metrics, gp_detector.intervals), key=lambda x: x[0])
+lowest_3_intervals = sorted_intervals[:3]
 
 # Check identified anomalies
 anomalous = np.zeros_like(y)
-anomalous[gp_detector.best_interval[0]:gp_detector.best_interval[1]] = 1
+
+# Every interval in lowest_3_intervals is anomalous
+for interval in lowest_3_intervals:
+    start, end = interval[1]
+    anomalous[start:end] = 1
 
 identified, identified_ratio = check_identified_anomalies(
     anomaly_locs, 
@@ -166,9 +174,9 @@ gp_results = pd.DataFrame([results], columns=column_names)
 # Write gp_results to results_dir
 results_dir = '../results/'
 if args.whitenoise == 1:
-    final_filename = results_dir + args.results_filename + '/whitenoise.csv'
+    final_filename = results_dir + args.save_dir + '/whitenoise.csv'
 else:
-    final_filename = results_dir + args.results_filename + '/lc_' + str(args.file_number) + '.csv'
+    final_filename = results_dir + args.save_dir + '/lc_' + str(args.file_number) + '.csv'
 print(f"Writing results to {final_filename}")
 
 # Append results to results file if it exists, else create it
@@ -178,6 +186,7 @@ try:
     gp_results.to_csv(final_filename, index=False)
 
 except FileNotFoundError:
+    # Make directory if it doesn't exist
     gp_results.to_csv(final_filename, index=False)   
 
 # Get running time

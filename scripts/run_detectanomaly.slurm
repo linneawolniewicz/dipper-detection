@@ -2,8 +2,8 @@
 # See https://slurm.schedmd.com/job_array.html
 # See https://uhawaii.atlassian.net/wiki/spaces/HPC/pages/430407770/The+Basics+Partition+Information+on+Koa for KOA partition info
 
-#SBATCH --partition=sadow # sadow, gpu, shared, kill-shared, exclusive-long
-#SBATCH --account=sadow
+#SBATCH --partition=gpu # sadow, gpu, shared, kill-shared, exclusive-long
+##SBATCH --account=sadow
 ##SBATCH --nodelist=gpu-0008
 
 #SBATCH --gres=gpu:1
@@ -12,7 +12,7 @@
 #SBATCH --mem=8gb ## max amount of memory per node you require
 #SBATCH --time=3-00:00:00 ## time format is DD-HH:MM:SS, 3day max on kill-shared, 7day max on exclusive-long, 14day max on sadow
 
-#SBATCH --job-name=gp_grow
+#SBATCH --job-name=gp_grow_10
 #SBATCH --output=job.out
 #SBATCH --output=../logs/slurm_output/job-%A.out
 #SBATCH --mail-type=START,END,FAIL
@@ -33,15 +33,16 @@ source activate dipper_detect
 # python file.py
 
 # Create a for loop to run the script with different arguments
-period_scales=(0.001 0.005 0.030 0.166 0.910 5.000)
-snrs=(5 2.5 1)
+period_scales=(0.001 0.003 0.011 0.039 0.13 0.439 1.484 5.000)
+snrs=(1 2 3 4)
 shape='gaussian'
-results_filename='gp_periodic_vs_flat_compare_grid'
+results_filename='gp_periodic_vs_flat_compare_grid_2'
 min_contiguous=10
 detection_range=50
 file_number=$SLURM_ARRAY_TASK_ID # Each array job gets a single file_number based on the task ID
 whitenoise=0 # if 1, test on whitenoise. Else, test on real k2 files
 num_repeats=10
+len_deviant=0
 
 # Run for each width, amplitude, and shape
 for period_scale in "${period_scales[@]}"
@@ -61,7 +62,7 @@ do
 
             # Run the script with the selected file_number and anomaly parameters
             echo "Running file_number: $file_number with anomaly parameters loc: $loc, period_scale: $period_scale, snr: $snr, shape: $shape, whitenoise: $whitenoise, and save to $results_filename"
-            python evaluate_gp_detectanomaly.py --file_number $file_number --loc $loc --period_scale $period_scale --snr $snr --shape $shape --results_filename $results_filename --detection_range $detection_range --min_contiguous $min_contiguous --whitenoise $whitenoise
+            python evaluate_gp_detectanomaly.py --file_number $file_number --loc $loc --period_scale $period_scale --snr $snr --shape $shape --results_filename $results_filename --detection_range $detection_range --min_contiguous $min_contiguous --whitenoise $whitenoise --len_deviant $len_deviant
 
             ((count++))
         done

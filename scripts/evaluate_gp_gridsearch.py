@@ -78,7 +78,7 @@ y = (y - mean_y) / std_y
 y_err = y_err / std_y
 
 # Hyperparameters
-min_anomaly_len = int(1 / (2 * np.median(np.diff(x))))  # Nyquist frequency
+min_anomaly_len = max(1, int(1 / (2 * np.median(np.diff(x)))))  # Nyquist frequency with minimum of 1
 max_anomaly_len = int(0.1 * len(x))  # Max 10% of total time steps
 initial_lengthscale = 0.5
 training_iterations = 50

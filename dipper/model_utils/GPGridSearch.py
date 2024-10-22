@@ -55,6 +55,12 @@ class GPGridSearch:
         self.num_steps = len(x)
         self.anomalous = np.zeros(self.num_steps) # 0 means non-anomalous, 1 means anomalous at that time step
 
+        # Check that min_anomaly_len is at least 1 and that max_anomaly_len is at least min_anomaly_len
+        if min_anomaly_len < 1:
+            raise ValueError("min_anomaly_len must be at least 1")
+        if max_anomaly_len < min_anomaly_len:
+            raise ValueError("max_anomaly_len must be at least min_anomaly_len")
+
         # Create original copies of x, y, and y_err
         self.x_orig = np.copy(x)
         self.y_orig = np.copy(y)
@@ -87,7 +93,7 @@ class GPGridSearch:
                 f.write('start,end,metric\n')
 
         # Iterate over each possible anomaly interval
-        for start, end in self.intervals:
+        for start, end in self.intervals: 
             metric_sum = 0
 
             # Create train data without interval

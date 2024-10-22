@@ -28,6 +28,7 @@ parser.add_argument('--min_contiguous', type=int, default=1)
 parser.add_argument('--detection_range', type=int, default=100)
 parser.add_argument('--results_filename', type=str, default='gp_results')
 parser.add_argument('--whitenoise', type=int, default=0)
+parser.add_argument('--len_deviant', type=int, default=0)
 args = parser.parse_args()
 
 # Load the data
@@ -86,6 +87,7 @@ gp_detector = GPDetectAnomaly(
     num_anomalies=num_anomalies,
     initial_lengthscale=initial_lengthscale,
     expansion_param=expansion_param,
+    len_deviant=args.len_deviant
 )
 
 gp_detector.detect_anomaly(
@@ -120,7 +122,8 @@ column_names = [
     'detection_range', 
     'min_contiguous', 
     'identified', 
-    'identified_ratio'
+    'identified_ratio',
+    'len_deviant'
 ]
 
 results = {
@@ -135,7 +138,8 @@ results = {
     'detection_range': args.detection_range,
     'min_contiguous': args.min_contiguous,
     'identified': str(identified), 
-    'identified_ratio': identified_ratio
+    'identified_ratio': identified_ratio,
+    'len_deviant': args.len_deviant
 }
 
 # Convert results to a dataframe

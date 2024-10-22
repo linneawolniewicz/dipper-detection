@@ -9,7 +9,7 @@
 #SBATCH --array=3,9,17,18,27,28,29,43,44,48,70
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=3 ## # cores per task
-#SBATCH --mem=18gb ## max amount of memory per node you require
+#SBATCH --mem=8gb ## max amount of memory per node you require
 #SBATCH --time=3-00:00:00 ## time format is DD-HH:MM:SS, 3day max on kill-shared, 7day max on exclusive-long, 14day max on sadow
 
 #SBATCH --job-name=gp_grid
@@ -33,10 +33,10 @@ source activate dipper_detect
 # python file.py
 
 echo This is job $SLURM_ARRAY_JOB_ID task $SLURM_ARRAY_TASK_ID running on $HOSTNAME
-period_scales=(0.001 0.005 0.030 0.166 0.910 5.000)
-depths=(5 2.5 1)
+period_scales=(0.001 0.003 0.011 0.039 0.13 0.439 1.484 5.000)
+snrs=(1 2 3 4)
 shape='gaussian'
-save_dir='grid_search_multiple_loc'
+save_dir='grid_search_multiple_loc_2'
 window_slide_step=20
 window_size_step=60
 assume_independent=1 # 1=True, 0=False
@@ -53,12 +53,6 @@ do
     do
         # Reset the count
         count=1
-
-        # if period_scale = 0.001 and snr = 5, skip
-        if [ $period_scale = 0.001 ] && [ $snr = 5 ]
-        then
-            count=10
-        fi
 
         # Repeat num_repeats times
         while [ $count -le $num_repeats ]

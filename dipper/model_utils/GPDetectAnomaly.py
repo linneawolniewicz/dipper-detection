@@ -15,7 +15,8 @@ class GPDetectAnomaly:
             which_metric='mll', # 'nlpd', 'msll', 'rmse', or default is 'mll'
             num_anomalies=1, # Number of anomalies to detect
             initial_lengthscale=None, # If None, no lengthscale is used (default) and the theta parameter is the identity matrix
-            expansion_param=1 # how many indices left and right to increase anomaly by
+            expansion_param=1, # how many indices left and right to increase anomaly by
+            len_deviant=0 # how indices to consider for the maximum deviation metric
         ):
 
         self.x = x
@@ -34,6 +35,7 @@ class GPDetectAnomaly:
         self.anomalous = np.zeros(self.num_steps) # 0 means non-anomalous, 1 means anomalous at that time step
         self.initial_lengthscale = initial_lengthscale 
         self.expansion_param = expansion_param 
+        self.len_deviant = len_deviant
 
     def detect_anomaly(
             self, 
@@ -46,7 +48,7 @@ class GPDetectAnomaly:
         '''
         Method:
             1. Perform GP regression on the timeseries.
-            2. Find the most significant outlier point.
+            2. Find the most significant outlier interval (based on sum of deviations) of length len_deviant.
             3. Exclude that point and redo regression. See if GP improves by some threshold.
             4. Exclude adjacent points and redo step 3.
             5. Repeat step 4 as long as GP improves the fit by some threshold.
@@ -84,9 +86,22 @@ class GPDetectAnomaly:
             # Find index of largest deviation
             sig_dev = (pred_mean - self.y) / self.y_err
             non_anomalous_indices = np.where(self.anomalous == 0)[0]  # Indices where anomalous == 0
-            index = non_anomalous_indices[np.argmax(sig_dev[self.anomalous == 0])]  # Correct index in original array
-            assert self.anomalous[index] == 0, f"Anomaly index {index} is already flagged as anomalous"
-            print(f"\n\n New dip identified at anomalous index {index}, x[index] = {self.x[index]}, anomalous[index] = {self.anomalous[index]}")
+
+            # Calculate the sum of deviations for len_deviant points
+            max_sum_deviation = -np.inf
+            index = -1
+            for j in range(len(non_anomalous_indices) - self.len_deviant + 1):
+                sum_deviation = np.sum(np.abs(sig_dev[non_anomalous_indices[j:j + self.len_deviant]]))
+                if sum_deviation > max_sum_deviation:
+                    max_sum_deviation = sum_deviation
+                    index = non_anomalous_indices[j]            
+                    assert self.anomalous[index] == 0, f"Anomaly index {index} is already flagged as anomalous"
+
+            # Intialize variables for expanding anomalous region
+            left_edge = index
+            right_edge = index + self.len_deviant
+            diff_metric = 1e6
+            metric = 1e6
 
             # Plot if desired
             if plot:
@@ -114,16 +129,10 @@ class GPDetectAnomaly:
                         axs[1].axvspan(self.x[anomaly_range[0]], self.x[anomaly_range[-1]], color='gold')
 
                 # Plot the index of the new anomaly
-                axs[1].axvline(x=self.x[index], color='b', linestyle='--', alpha=0.5, label="New flagged anomaly")
+                axs[1].axvspan(self.x[left_edge], self.x[right_edge], color='red', alpha=0.5, label="New flagged anomaly")
                 axs[1].legend()
                 plt.show(block=False)
                 plt.close()
-
-            # Intialize variables for expanding anomalous region
-            left_edge = index
-            right_edge = index
-            diff_metric = 1e6
-            metric = 1e6
             
             # While the metric is decreasing, expand the anomalous edges
             while diff_metric > 0:

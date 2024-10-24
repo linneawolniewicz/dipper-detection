@@ -102,6 +102,10 @@ gp_detector.find_anomalous_interval(
     silent=True
 )
 
+# If args.min_contiguous > min_anomaly_len, set it to min_anomaly_len
+if args.min_contiguous > min_anomaly_len:
+    args.min_contiguous = min_anomaly_len
+
 # Find the 3 lowest mean_metric values and their related intervals
 sorted_intervals = sorted(zip(gp_detector.mean_metrics, gp_detector.intervals), key=lambda x: x[0])
 lowest_3_intervals = sorted_intervals[:3]
@@ -121,7 +125,7 @@ identified, identified_ratio = check_identified_anomalies(
     args.min_contiguous
 )
 
-print(f"Number of anomaly intervals: {len(gp_detector.intervals)}, True anomaly idx: {args.loc}, Best interval: {gp_detector.best_interval}, Min metric: {gp_detector.min_metric}, identified: {identified}")
+print(f"Number of anomaly intervals: {len(gp_detector.intervals)}, True anomaly idx: {args.loc}, identified: {identified}, 3 lowest intervals: {lowest_3_intervals}")
 
 # Put results into a dictionary
 column_names = [

@@ -127,6 +127,7 @@ identified, identified_ratio = check_identified_anomalies(
 
 print(f"Number of anomaly intervals: {len(gp_detector.intervals)}, True anomaly idx: {args.loc}, identified: {identified}, 3 lowest intervals: {lowest_3_intervals}")
 
+# TODO: Add flagged_anomalies like grow_deviant method, and have columns match so can use one analysis code
 # Put results into a dictionary
 column_names = [
     'file_number', 

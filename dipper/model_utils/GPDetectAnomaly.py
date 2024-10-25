@@ -16,7 +16,7 @@ class GPDetectAnomaly:
             num_anomalies=1, # Number of anomalies to detect
             initial_lengthscale=None, # If None, no lengthscale is used (default) and the theta parameter is the identity matrix
             expansion_param=1, # how many indices left and right to increase anomaly by
-            len_deviant=0 # how indices to consider for the maximum deviation metric
+            len_deviant=1 # how indices to consider for the maximum deviation metric
         ):
 
         self.x = x
@@ -36,6 +36,8 @@ class GPDetectAnomaly:
         self.initial_lengthscale = initial_lengthscale 
         self.expansion_param = expansion_param 
         self.len_deviant = len_deviant
+
+        assert self.len_deviant > 0, "len_deviant must be greater than 0"
 
     def detect_anomaly(
             self, 
@@ -83,23 +85,30 @@ class GPDetectAnomaly:
                 observed_pred = likelihood(model(torch.tensor(self.x, dtype=torch.float32).to(device)))
                 pred_mean = observed_pred.mean.cpu().numpy()
 
-            # Find index of largest deviation
+            # Find max_sum_idx of largest deviation
             sig_dev = (pred_mean - self.y) / self.y_err
             non_anomalous_indices = np.where(self.anomalous == 0)[0]  # Indices where anomalous == 0
 
             # Calculate the sum of deviations for len_deviant points
             max_sum_deviation = -np.inf
-            index = -1
-            for j in range(len(non_anomalous_indices) - self.len_deviant + 1):
-                sum_deviation = np.sum(np.abs(sig_dev[non_anomalous_indices[j:j + self.len_deviant]]))
+            for j in range(len(sig_dev) - self.len_deviant + 1):
+                interval = np.arange(j, j+self.len_deviant)
+                deviations = np.abs(sig_dev[interval])
+
+                # Only add deviations for non-anomalous points to the sum
+                sum_deviation = 0
+                for i in range(len(interval)):
+                    if interval[i] in non_anomalous_indices:
+                        sum_deviation += deviations[i]
+                
                 if sum_deviation > max_sum_deviation:
                     max_sum_deviation = sum_deviation
-                    index = non_anomalous_indices[j]            
-                    assert self.anomalous[index] == 0, f"Anomaly index {index} is already flagged as anomalous"
+                    max_sum_idx = j        
+                    assert self.anomalous[max_sum_idx] == 0, f"Anomaly max_sum_idx {max_sum_idx} is already flagged as anomalous"          
 
             # Intialize variables for expanding anomalous region
-            left_edge = index
-            right_edge = index + self.len_deviant
+            left_edge = max_sum_idx
+            right_edge = max_sum_idx + self.len_deviant
             diff_metric = 1e6
             metric = 1e6
 
@@ -128,7 +137,7 @@ class GPDetectAnomaly:
                         anomaly_range = np.arange(int(anomaly_locs[i]) - int(detection_range), int(anomaly_locs[i]) + int(detection_range))
                         axs[1].axvspan(self.x[anomaly_range[0]], self.x[anomaly_range[-1]], color='gold')
 
-                # Plot the index of the new anomaly
+                # Plot the max_sum_idx of the new anomaly
                 axs[1].axvspan(self.x[left_edge], self.x[right_edge], color='red', alpha=0.5, label="New flagged anomaly")
                 axs[1].legend()
                 plt.show(block=False)
@@ -177,7 +186,6 @@ class GPDetectAnomaly:
                         metric = mll(output, y_sub)
 
                 diff_metric = old_metric - metric # smaller is better
-                # print(f"Old metric: {old_metric} - New metric: {metric} = Diff metric: {diff_metric}")
 
                 # Expand anomalous region on both sides
                 if left_edge >= 0 + self.expansion_param:
@@ -185,8 +193,6 @@ class GPDetectAnomaly:
 
                 if right_edge < self.num_steps - self.expansion_param:
                     right_edge += self.expansion_param
-
-                # print(f"Anomaly index {i} x[i] {self.x[i]}, left_edge:right_edge {left_edge}:{right_edge}")
 
             # Update anomalous array and remove anomalies from y
             self.y[left_edge:right_edge] = pred_mean_full[left_edge:right_edge]

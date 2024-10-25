@@ -42,7 +42,7 @@ detection_range=50
 file_number=$SLURM_ARRAY_TASK_ID # Each array job gets a single file_number based on the task ID
 whitenoise=0 # if 1, test on whitenoise. Else, test on real k2 files
 num_repeats=10
-len_deviant=0
+len_deviant=1
 
 # Run for each width, amplitude, and shape
 for period_scale in "${period_scales[@]}"

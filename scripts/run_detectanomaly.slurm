@@ -12,7 +12,7 @@
 #SBATCH --mem=8gb ## max amount of memory per node you require
 #SBATCH --time=3-00:00:00 ## time format is DD-HH:MM:SS, 3day max on kill-shared, 7day max on exclusive-long, 14day max on sadow
 
-#SBATCH --job-name=gp_grow_1
+#SBATCH --job-name=gp_grow_10
 #SBATCH --output=job.out
 #SBATCH --output=../logs/slurm_output/job-%A.out
 #SBATCH --mail-type=START,END,FAIL
@@ -42,7 +42,7 @@ detection_range=50
 file_number=$SLURM_ARRAY_TASK_ID # Each array job gets a single file_number based on the task ID
 whitenoise=0 # if 1, test on whitenoise. Else, test on real k2 files
 num_repeats=10
-len_deviant=1
+len_deviant=10
 
 # Run for each width, amplitude, and shape
 for period_scale in "${period_scales[@]}"

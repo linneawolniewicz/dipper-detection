@@ -88,7 +88,6 @@ class GPDetectAnomaly:
             # Find max_sum_idx of largest deviation
             sig_dev = (pred_mean - self.y) / self.y_err
             non_anomalous_indices = np.where(self.anomalous == 0)[0]  # Indices where anomalous == 0
-            print(f"\nanomalous_indices: {np.where(self.anomalous == 1)[0]}")
 
             # Calculate the sum of deviations for len_deviant points
             max_sum_deviation = 0
@@ -99,17 +98,12 @@ class GPDetectAnomaly:
                 # Only add deviations for non-anomalous points to the sum
                 sum_deviation = 0
                 for k in range(len(interval)):
-                    print(f"interval: {interval}, interval[k]: {interval[k]}, k: {k}, deviations: {deviations}, deviations[k]: {deviations[k]}")
                     if interval[k] in non_anomalous_indices:
                         sum_deviation += deviations[k]
-                        print(f"Adding to deviation! sum_deviation: {sum_deviation}")
-                
-                print(f"j {j}, j+self.len_deviant {j+self.len_deviant}, sum_deviation {sum_deviation}, max_sum_deviation: {max_sum_deviation}")
 
                 if sum_deviation > max_sum_deviation:
                     max_sum_deviation = sum_deviation
-                    max_sum_idx = j        
-                    assert self.anomalous[max_sum_idx] == 0, f"Anomaly max_sum_idx {max_sum_idx} is already flagged as anomalous"          
+                    max_sum_idx = j      
 
             # Intialize variables for expanding anomalous region
             left_edge = max_sum_idx

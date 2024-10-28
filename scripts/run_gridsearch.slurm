@@ -36,7 +36,7 @@ echo This is job $SLURM_ARRAY_JOB_ID task $SLURM_ARRAY_TASK_ID running on $HOSTN
 period_scales=(0.001 0.003 0.011 0.039 0.13 0.439 1.484 5.000)
 snrs=(1 2 3 4)
 shape='gaussian'
-save_dir='grid_search_multiple_loc'
+save_dir='grid_search_multiple_loc_2'
 window_slide_step=20
 window_size_step=60
 assume_independent=1 # 1=True, 0=False

@@ -1,4 +1,4 @@
-from dipper.model_utils.GPDetectAnomaly import *
+from dipper.model_utils.GPGrowDeviant import *
 import unittest
 import numpy as np
 

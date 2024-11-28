@@ -86,7 +86,7 @@ class GPGrowDeviant:
                 pred_mean = observed_pred.mean.cpu().numpy()
 
             # Find max_sum_idx of largest deviation
-            sig_dev = (pred_mean - self.y) / self.y_err
+            sig_dev = (pred_mean - self.y) / self.y_err # TODO: does this make sense? FixedNoiseGaussianLikelihood already accounts for y_err
             non_anomalous_indices = np.where(self.anomalous == 0)[0]  # Indices where anomalous == 0
 
             # Calculate the sum of deviations for len_deviant points

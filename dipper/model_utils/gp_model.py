@@ -28,12 +28,12 @@ class ExactGPModel(gpytorch.models.ExactGP):
         return MultivariateNormal(mean_x, covar_x)
 
 # Function to train GP model
-def train_gp(x_train, y_train, y_err_train, training_iterations=50, lengthscale=None, device=torch.device("cpu")):
+def train_gp(x_train, y_train, y_err_train, training_iterations=50, lengthscale=None, device=torch.device("cpu"), learn_additional_noise=True):
     # If this gives numerical warnings, use GaussianLikelihood() instead of FixedNoiseGaussianLikelihood()
     noise_variances = y_err_train ** 2
     likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(
         noise=noise_variances, 
-        learn_additional_noise=True
+        learn_additional_noise=learn_additional_noise
     ).to(device)
 
     # Initialize likelihood and model

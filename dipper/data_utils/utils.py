@@ -5,6 +5,22 @@ from scipy.signal import find_peaks, periodogram, windows
 from scipy.ndimage import gaussian_filter1d
 from astropy.io import fits
 
+def get_dom_period(lightcurve):
+    freqs, power = periodogram(lightcurve)
+    peaks, _ = find_peaks(power)
+    if len(peaks) == 0:
+        print("No peaks found in power spectrum, using shoulder instead.")
+        smooth_power = gaussian_filter1d(power, 2)
+        slope = np.gradient(smooth_power, freqs)
+        shoulder_idx = np.where(slope < 0)[0][0]
+        dominant_period = 1 / freqs[shoulder_idx]
+        
+    else:
+        dominant_peak = peaks[np.argmax(power[peaks])]
+        dominant_period = 1 / freqs[dominant_peak]
+
+    return dominant_period
+
 def generate_anomaly(
         num_anomalies, 
         lightcurve,
@@ -35,20 +51,7 @@ def generate_anomaly(
         period_scale = rng.uniform(0.1, 2) # period scaling of anomaly
 
     # Create anomaly_width from period of peak in power spectrum
-    freqs, power = periodogram(lightcurve)
-    peaks, _ = find_peaks(power)
-    if len(peaks) == 0:
-        print("No peaks found in power spectrum, using shoulder instead")
-        smooth_power = gaussian_filter1d(power, 2)
-        slope = np.gradient(smooth_power, freqs)
-        shoulder_idx = np.where(slope < 0)[0][0]
-        dominant_period = 1 / freqs[shoulder_idx]
-        
-    else:
-        dominant_peak = peaks[np.argmax(power[peaks])]
-        dominant_period = 1 / freqs[dominant_peak]
-    
-    anomaly_period = period_scale * dominant_period
+    anomaly_period = period_scale * get_dom_period(lightcurve)
     anomaly_width = max(anomaly_period / (2 * np.sqrt(2 * np.log(2))), 1) # minimum value of 1. Note this is the sigma of the anomaly (assuming gaussian)
     anomaly_fwhm = 2.355 * anomaly_width # True for gaussian-shaped anomalies
 
@@ -78,7 +81,7 @@ def generate_anomaly(
     return anomaly, anomaly_locs, anomaly_amp, anomaly_fwhm
 
 # Simulates a K2-like lightcurve with red-noisy periodic lightcurve with a step, a trend, and an inserted anomaly
-def generate_synthetic_lc(
+def generate_synthetic_lc_parameterized(
         num_anomalies=1,
         rednoise_amp=1.0, 
         whitenoise_amp=1.0, 

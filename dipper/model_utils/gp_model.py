@@ -1,5 +1,6 @@
 import gpytorch
 import torch
+import matplotlib.pyplot as plt
 from gpytorch.kernels import Kernel, PeriodicKernel, RBFKernel, ScaleKernel
 from gpytorch.distributions import MultivariateNormal
 
@@ -27,6 +28,39 @@ class ExactGPModel(gpytorch.models.ExactGP):
         covar_x = self.covar_module(x)
         return MultivariateNormal(mean_x, covar_x)
 
+# Create a parameterized Quasi-Periodic Kernel
+class ParameterizedQuasiPeriodicKernel(Kernel):
+    def __init__(self, period_length, periodic_lengthscale, rbf_lengthscale):
+        super().__init__()
+        self.periodic_kernel = PeriodicKernel()
+        self.periodic_kernel.period_length = period_length
+        self.periodic_kernel.lengthscale = periodic_lengthscale
+
+        self.rbf_kernel = RBFKernel()
+        self.rbf_kernel.lengthscale = rbf_lengthscale
+
+    def forward(self, x1, x2, diag=False, **params):
+        periodic_part = self.periodic_kernel.forward(x1, x2, diag=diag, **params)
+        rbf_part = self.rbf_kernel.forward(x1, x2, diag=diag, **params)
+        return periodic_part * rbf_part
+
+# Define GP model with parameterized kernel
+class ParameterizedGPModel(gpytorch.models.GP):
+    def __init__(self, kernel, mean_constant, outputscale, noise_vars):
+        super().__init__()
+        self.mean_module = gpytorch.means.ConstantMean()
+        self.mean_module.constant = mean_constant
+        
+        self.covar_module = ScaleKernel(kernel)
+        self.covar_module.outputscale = outputscale
+
+        self.likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise_vars)
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return MultivariateNormal(mean_x, covar_x)
+
 # Function to train GP model
 def train_gp(
         x_train, 
@@ -36,7 +70,8 @@ def train_gp(
         lr=0.1,
         learn_additional_noise=True, 
         device=torch.device("cpu"), 
-        kernel=None
+        kernel=None,
+        plot=False
     ):
     # Create noisy likelihood
     noise_variances = y_err_train ** 2
@@ -71,12 +106,45 @@ def train_gp(
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
     
-    # Training loop
+    # Plot loss during training
+    losses = []
     for i in range(training_iterations):
         optimizer.zero_grad()
         output = model(x_train)
         loss = -mll(output, y_train)
         loss.backward()
         optimizer.step()
-        
+        losses.append(loss.item())
+
+    if plot:
+        # Plot the loss
+        plt.figure(figsize=(10,5))
+        plt.plot(range(training_iterations), losses)
+        plt.xlabel("Iteration")
+        plt.ylabel("Loss")
+        plt.title("Training Loss")
+        plt.show()
+
+        # Plot the covariance matrices
+        with torch.no_grad():
+            periodic_cov = model.covar_module.base_kernel.periodic_kernel(torch.tensor(x).to(device)).evaluate()
+            rbf_cov = model.covar_module.base_kernel.rbf_kernel(torch.tensor(x).to(device)).evaluate()
+
+        plt.figure(figsize=(15, 5))
+        plt.subplot(1, 3, 1)
+        plt.title("Periodic Kernel Covariance")
+        plt.imshow(periodic_cov.cpu().numpy(), cmap='viridis')
+        plt.colorbar()
+
+        plt.subplot(1, 3, 2)
+        plt.title("RBF Kernel Covariance")
+        plt.imshow(rbf_cov.cpu().numpy(), cmap='viridis')
+        plt.colorbar()
+
+        plt.subplot(1, 3, 3)
+        plt.title("RBF * Periodic Kernel Covariance")
+        plt.imshow(rbf_cov.cpu().numpy() * periodic_cov.cpu().numpy(), cmap='viridis')
+        plt.colorbar()
+        plt.show()
+
     return model, likelihood, mll

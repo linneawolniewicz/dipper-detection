@@ -46,7 +46,7 @@ class ParameterizedQuasiPeriodicKernel(Kernel):
 
 # Define GP model with parameterized kernel
 class ParameterizedGPModel(gpytorch.models.GP):
-    def __init__(self, kernel, mean_constant, outputscale, noise_vars):
+    def __init__(self, kernel, mean_constant, outputscale, likelihood):
         super().__init__()
         self.mean_module = gpytorch.means.ConstantMean()
         self.mean_module.constant = mean_constant
@@ -54,7 +54,7 @@ class ParameterizedGPModel(gpytorch.models.GP):
         self.covar_module = ScaleKernel(kernel)
         self.covar_module.outputscale = outputscale
 
-        self.likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise_vars)
+        self.likelihood = likelihood
 
     def forward(self, x):
         mean_x = self.mean_module(x)

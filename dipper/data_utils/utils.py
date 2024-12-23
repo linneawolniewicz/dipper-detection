@@ -168,7 +168,7 @@ def load_k2_data(filename):
     # Set x, y, and error
     x = time
     y = pdc_flux / np.nanmedian(pdc_flux)
-    y_err = pdc_err / np.nanmedian(pdc_flux)
+    y_err = pdc_err / np.nanmedian(pdc_flux) # TODO: Check is this the right way to scale the error?
 
     # Clean
     clean = (y_err > 0.)

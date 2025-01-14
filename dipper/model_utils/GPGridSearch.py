@@ -77,6 +77,8 @@ class GPGridSearch:
         
         self.mean_metrics = []
 
+        UserWarning("This class has not been updated to work with the new train_gp function. Please update the class to use the new function.")
+
     def find_anomalous_interval(self, device=torch.device("cpu"), training_iterations=10, filename="", silent=True):
         # Initialize
         self.min_metric = np.inf

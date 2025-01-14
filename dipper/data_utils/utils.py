@@ -162,22 +162,22 @@ def load_k2_data(filename):
     # Load data
     data = fits_file[1].data
     time = np.array(data['TIME'])
-    pdc_flux = np.array(data['PDCSAP_FLUX'])
-    pdc_err = np.array(data['PDCSAP_FLUX_ERR'])
+    pdc_flux = np.array(data['PDCSAP_FLUX'])*1.
+    pdc_err = np.array(data['PDCSAP_FLUX_ERR'])*1.
 
     # Set x, y, and error
     x = time
     y = pdc_flux / np.nanmedian(pdc_flux)
-    y_err = pdc_err / np.nanmedian(pdc_flux) # TODO: Check is this the right way to scale the error?
+    y_err = pdc_err / np.nanmedian(pdc_flux)
 
     # Clean
-    clean = (y_err > 0.)
+    clean = ((y < 1.5) & (y > 0.5) & (y_err > 0.))
     x = x[clean]
     y = y[clean]
     y_err = np.abs(y_err[clean]) 
 
     # Shift to start at time 0
-    x = x - np.min(x) 
+    x = x - np.min(x)
 
     # Bin to 30-minute cadence
     num_bins = int(np.floor((np.max(x) - np.min(x)) * 48) + 1) # 48 bins per day
@@ -186,6 +186,10 @@ def load_k2_data(filename):
     num_binned = np.array(num_binned)
     y_binned, bin_edges = np.histogram(x, bins = x_bins, weights = y)
     var_binned, bin_edges = np.histogram(x, bins = x_bins, weights= 1 / y_err**2)
+
+    # Where var_binned is 0, set to min value of var_binned
+    var_binned[var_binned == 0] = np.min(var_binned[var_binned > 0])
+    
     y_err_binned = 1 / np.sqrt(np.array(var_binned))
     y_binned = np.array(y_binned)
     y_binned = y_binned / (num_binned + 0.001)
@@ -195,7 +199,7 @@ def load_k2_data(filename):
     y_err = y_err_binned
 
     # Clean
-    clean = ((y > 0.) & ~np.isnan(y_err))
+    clean = ((y > 0.) & ~np.isnan(y_err) & (y_err > 0.))
     x = x[clean]
     y = y[clean]
     y_err = y_err[clean]

@@ -39,6 +39,8 @@ class GPGrowDeviant:
 
         assert self.len_deviant > 0, "len_deviant must be greater than 0"
 
+        UserWarning("This class has not been updated to work with the new train_gp function. Please update the class to use the new function.")
+
     def detect_anomaly(
             self, 
             training_iterations=30, 

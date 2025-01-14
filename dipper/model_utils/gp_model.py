@@ -1,59 +1,50 @@
 import gpytorch
 import torch
 import matplotlib.pyplot as plt
+
+from gpytorch.means import ConstantMean
+from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.kernels import Kernel, PeriodicKernel, RBFKernel, ScaleKernel
 from gpytorch.distributions import MultivariateNormal
 
 # Create a Quasi-Periodic Kernel
 class QuasiPeriodicKernel(Kernel):
-    def __init__(self, **kwargs):
+    def __init__(self, periodic_kernel=None, rbf_kernel=None, **kwargs):
         super(QuasiPeriodicKernel, self).__init__(**kwargs)
-        self.periodic_kernel = PeriodicKernel(**kwargs)
-        self.rbf_kernel = RBFKernel(**kwargs)
+        if periodic_kernel is None:
+            self.periodic_kernel = PeriodicKernel(**kwargs)
+        else:
+            self.periodic_kernel = periodic_kernel
+        
+        if rbf_kernel is None:
+            self.rbf_kernel = RBFKernel(**kwargs)
+        else:
+            self.rbf_kernel = rbf_kernel
 
     def forward(self, x1, x2, diag=False, **params):
         periodic_part = self.periodic_kernel.forward(x1, x2, diag=diag, **params)
         rbf_part = self.rbf_kernel.forward(x1, x2, diag=diag, **params)
         return periodic_part * rbf_part
 
-# Define GP model
+# Create a GP model
 class ExactGPModel(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, likelihood, kernel):
+    def __init__(self, train_x, train_y, likelihood, kernel, mean):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
-        self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = ScaleKernel(kernel)
+        self.mean_module = mean
+        self.covar_module = kernel
+        self.likelihood = likelihood
 
     def forward(self, x):
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
         return MultivariateNormal(mean_x, covar_x)
 
-# Create a parameterized Quasi-Periodic Kernel
-class ParameterizedQuasiPeriodicKernel(Kernel):
-    def __init__(self, period_length, periodic_lengthscale, rbf_lengthscale):
-        super().__init__()
-        self.periodic_kernel = PeriodicKernel()
-        self.periodic_kernel.period_length = period_length
-        self.periodic_kernel.lengthscale = periodic_lengthscale
-
-        self.rbf_kernel = RBFKernel()
-        self.rbf_kernel.lengthscale = rbf_lengthscale
-
-    def forward(self, x1, x2, diag=False, **params):
-        periodic_part = self.periodic_kernel.forward(x1, x2, diag=diag, **params)
-        rbf_part = self.rbf_kernel.forward(x1, x2, diag=diag, **params)
-        return periodic_part * rbf_part
-
 # Define GP model with parameterized kernel
 class ParameterizedGPModel(gpytorch.models.GP):
-    def __init__(self, kernel, mean_constant, outputscale, likelihood):
+    def __init__(self, kernel, mean, likelihood):
         super().__init__()
-        self.mean_module = gpytorch.means.ConstantMean()
-        self.mean_module.constant = mean_constant
-        
-        self.covar_module = ScaleKernel(kernel)
-        self.covar_module.outputscale = outputscale
-
+        self.mean_module = mean
+        self.covar_module = kernel
         self.likelihood = likelihood
 
     def forward(self, x):
@@ -65,20 +56,23 @@ class ParameterizedGPModel(gpytorch.models.GP):
 def train_gp(
         x_train, 
         y_train, 
-        y_err_train, 
-        training_iterations=50, 
-        lr=0.1,
-        learn_additional_noise=True, 
+        training_iterations=1_000, 
+        lr=0.01,
         device=torch.device("cpu"), 
+        likelihood=None,
         kernel=None,
+        mean=None,
+        early_stopping=True,
         plot=False
     ):
-    # Create noisy likelihood
-    noise_variances = y_err_train ** 2
-    likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(
-        noise=noise_variances, 
-        learn_additional_noise=learn_additional_noise
-    ).to(device) # If this gives numerical warnings, use GaussianLikelihood() instead of FixedNoiseGaussianLikelihood()
+
+    # Initialize likelihood
+    if likelihood is not None:
+        likelihood = likelihood.to(device)
+        
+    else:
+        print("No likelihood specified. Using Gaussian likelihood.")
+        likelihood = gpytorch.likelihoods.GaussianLikelihood().to(device)
 
     # Initialize model
     if kernel is not None:
@@ -87,6 +81,7 @@ def train_gp(
             y_train, 
             likelihood, 
             kernel,
+            mean
         ).to(device)
 
     else:
@@ -95,7 +90,8 @@ def train_gp(
             x_train, 
             y_train, 
             likelihood,
-            QuasiPeriodicKernel()
+            ScaleKernel(QuasiPeriodicKernel()),
+            ConstantMean()            
         ).to(device)
 
     # Find optimal hyperparameters
@@ -107,22 +103,44 @@ def train_gp(
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
     
     # Plot loss during training
-    losses = []
+    mll_losses = []
+    mse_losses = []
+    increase_count = 0
     for i in range(training_iterations):
         optimizer.zero_grad()
         output = model(x_train)
-        loss = -mll(output, y_train)
-        loss.backward()
+        mll_loss = -mll(output, y_train)
+        mse_loss = torch.nn.functional.mse_loss(output.mean, y_train)
+
+        # Early stopping
+        if early_stopping:
+            if i > 300 and mll_loss - mll_losses[i-1] > 0:
+                increase_count += 1
+            
+            if increase_count > 5:
+                print(f"Early stopping at iteration {i} due to increasing loss.")
+                break
+
+        mll_loss.backward()
         optimizer.step()
-        losses.append(loss.item())
+        mll_losses.append(mll_loss.item())
+        mse_losses.append(mse_loss.item())
 
     if plot:
         # Plot the loss
         plt.figure(figsize=(10,5))
-        plt.plot(range(training_iterations), losses)
+        plt.plot(range(len(mll_losses)), mll_losses)
         plt.xlabel("Iteration")
         plt.ylabel("Loss")
-        plt.title("Training Loss")
+        plt.title("MLL Loss")
+        plt.show()
+
+        # Plot the loss
+        plt.figure(figsize=(10,5))
+        plt.plot(range(len(mse_losses)), mse_losses)
+        plt.xlabel("Iteration")
+        plt.ylabel("Loss")
+        plt.title("MSE Loss")
         plt.show()
 
         # Plot the covariance matrices

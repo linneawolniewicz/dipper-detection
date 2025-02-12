@@ -1,23 +1,69 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy
-from scipy.signal import find_peaks, periodogram, windows
+from scipy.signal import find_peaks, periodogram, windows, peak_prominences
 from scipy.ndimage import gaussian_filter1d
 from astropy.io import fits
 
-def get_dom_period(lightcurve):
-    freqs, power = periodogram(lightcurve)
-    peaks, _ = find_peaks(power)
+def freq_idx_to_period_days(freqs_idx, times):
+    idx_day_scale_factor = (times[-1] - times[0]) / len(times)
+    periods = 1 / freqs_idx
+    periods_days = periods * idx_day_scale_factor
+
+    return periods_days
+
+def get_dom_period(y, x, prominence=50, plot=True):
+    # Get peaks in power spectrum
+    freqs, power = periodogram(y)
+    peaks, _ = find_peaks(power, prominence=prominence)
+
     if len(peaks) == 0:
         print("No peaks found in power spectrum, using shoulder instead.")
         smooth_power = gaussian_filter1d(power, 2)
         slope = np.gradient(smooth_power, freqs)
         shoulder_idx = np.where(slope < 0)[0][0]
-        dominant_period = 1 / freqs[shoulder_idx]
+        dominant_period = freq_idx_to_period_days(freqs[shoulder_idx], x)
         
     else:
-        dominant_peak = peaks[np.argmax(power[peaks])]
-        dominant_period = 1 / freqs[dominant_peak]
+        # Filter to most prominent peak
+        prominences, left_bases, right_bases = peak_prominences(power, peaks, wlen=5)
+
+        # If the left_base is 0 or the right_base is the last index, the peak is at the edge of the periodogram. Then we remove it
+        valid_peaks = np.where((left_bases != 0) & (right_bases != len(power) - 1))
+        if valid_peaks[0].shape[0] == 0:
+            print('No valid peaks found according to criteria that base is not at edge of periodogram. Thus we keep all peaks')
+        else:
+            peaks = peaks[valid_peaks]
+            left_bases = left_bases[valid_peaks]
+            right_bases = right_bases[valid_peaks]
+
+        max_peak = np.argmax(power[peaks])
+        dominant_period = freq_idx_to_period_days(freqs[peaks[max_peak]], x)
+
+    # Plot periodogram
+    if plot:
+        fig, axs = plt.subplots(1, 2, figsize=(15, 5))
+        axs[0].plot(freq_idx_to_period_days(freqs, x), power, label='Periodogram')
+        if len(peaks) > 0:
+            axs[0].plot(freq_idx_to_period_days(freqs[peaks], x), power[peaks], 'x', label='Peaks')
+            axs[0].plot(freq_idx_to_period_days(freqs[left_bases], x), power[left_bases], 'o', c='gray', label='Right bases') # Reversed bc period = 1/frequency
+            axs[0].plot(freq_idx_to_period_days(freqs[right_bases], x), power[right_bases], 'o', c='black', label='Left bases') # Reversed bc period = 1/frequency
+        else:
+            axs[0].plot(freq_idx_to_period_days(freqs[shoulder_idx:], x), power[shoulder_idx:], 'x', label='Shoulder')
+        axs[0].legend()
+        axs[0].set_xlabel('Period [days]')
+        axs[0].set_ylabel('Power')
+        axs[0].set_title(f'Periodogram with max peak at {dominant_period:.2f} days')
+
+        # Plot lightcurve with dominant period sinusoid
+        axs[1].scatter(x, y, s=2, label='Lightcurve')
+        axs[1].plot(x, np.sin(2 * np.pi * x / dominant_period) + 4, c='darkorange', label=f'Dominant period: {dominant_period:.2f} days')
+        axs[1].set_xlabel('Time [days]')
+        axs[1].set_ylabel('Flux')
+        axs[1].legend()
+
+        plt.tight_layout()
+        plt.show()
 
     return dominant_period
 

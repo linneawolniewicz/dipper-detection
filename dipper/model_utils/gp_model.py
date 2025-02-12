@@ -41,11 +41,10 @@ class ExactGPModel(gpytorch.models.ExactGP):
 
 # Define GP model with parameterized kernel
 class ParameterizedGPModel(gpytorch.models.GP):
-    def __init__(self, kernel, mean, likelihood):
+    def __init__(self, kernel, mean):
         super().__init__()
         self.mean_module = mean
         self.covar_module = kernel
-        self.likelihood = likelihood
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -65,6 +64,7 @@ def train_gp(
         likelihood=None,
         kernel=None,
         mean=None,
+        which_opt='adam',
         early_stopping=True,
         min_iterations=None,
         patience=1,
@@ -116,7 +116,12 @@ def train_gp(
     likelihood.train()
 
     # Set optimizer and loss
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    if which_opt == 'adam':
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    elif which_opt == 'sgd':
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+    else:
+        raise ValueError("which_opt must be either 'adam' or 'sgd'.")
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
     
     # Plot loss during training
@@ -129,9 +134,11 @@ def train_gp(
         pred = model(x_train)
 
         model.eval()
+        likelihood.eval()
         with torch.no_grad():
             valid_pred = model(x_valid)
         model.train()
+        likelihood.train()
 
         # Compute losses
         if which_metric == "mse":

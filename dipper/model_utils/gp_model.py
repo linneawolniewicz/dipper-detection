@@ -51,7 +51,6 @@ class ParameterizedGPModel(gpytorch.models.GP):
         covar_x = self.covar_module(x)
         return MultivariateNormal(mean_x, covar_x)
 
-# Function to train GP model
 def train_gp(
         x_train, 
         y_train, 
@@ -59,8 +58,6 @@ def train_gp(
         lr=0.01,
         device=torch.device("cpu"), 
         which_metric="mll",
-        x_valid=None,
-        y_valid=None,
         likelihood=None,
         kernel=None,
         mean=None,
@@ -77,11 +74,6 @@ def train_gp(
     if early_stopping and min_iterations is None:
         min_iterations = training_iterations // 10
         print(f"Using {min_iterations} as minimum iterations for early stopping.")
-
-    if y_valid is None:
-        print("No validation data provided. Using training data for validation.")
-        x_valid = x_train
-        y_valid = y_train
 
     # Initialize likelihood
     if likelihood is not None:
@@ -126,35 +118,25 @@ def train_gp(
     
     # Plot loss during training
     train_losses = []
-    valid_losses = []
     increase_count = 0
 
     for i in range(training_iterations):
         optimizer.zero_grad()
         pred = model(x_train)
 
-        model.eval()
-        likelihood.eval()
-        with torch.no_grad():
-            valid_pred = model(x_valid)
-        model.train()
-        likelihood.train()
-
         # Compute losses
         if which_metric == "mse":
             train_loss = torch.nn.functional.mse_loss(pred.mean, y_train)
-            valid_loss = torch.nn.functional.mse_loss(valid_pred.mean, y_valid)
         else:
             train_loss = -mll(pred, y_train)
-            valid_loss = -mll(valid_pred, y_valid)
 
         # Early stopping
         if early_stopping:
-            if i > min_iterations and valid_loss - valid_losses[i-1] > 0:
+            if i > min_iterations and train_loss - train_losses[i-1] > 0:
                 increase_count += 1
             
             if increase_count > patience:
-                print(f"Early stopping at iteration {i} due to increasing valid loss.")
+                print(f"Early stopping at iteration {i} due to increasing train loss.")
                 break
 
         train_loss.backward()
@@ -162,23 +144,14 @@ def train_gp(
 
         # Save losses
         train_losses.append(train_loss.item())
-        valid_losses.append(valid_loss.item())
 
     if plot:
-        # Plot the train and valid loss side by side 
-        plt.figure(figsize=(10,5))
-        plt.subplot(1, 2, 1)
+        # Plot the train loss 
+        plt.figure(figsize=(5,5))
         plt.plot(range(len(train_losses)), train_losses)
         plt.xlabel("Iteration")
         plt.ylabel("Train Loss")
         plt.title("Train Loss for metric " + which_metric)
-
-        plt.subplot(1, 2, 2)
-        plt.plot(range(len(valid_losses)), valid_losses)
-        plt.xlabel("Iteration")
-        plt.ylabel("Valid Loss")
-        plt.title("Valid Loss for metric " + which_metric)
-        plt.show()
 
         # Plot the covariance matrices
         with torch.no_grad():

@@ -6,6 +6,42 @@ from gpytorch.means import ConstantMean
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.kernels import Kernel, PeriodicKernel, RBFKernel, ScaleKernel
 from gpytorch.distributions import MultivariateNormal
+from gpytorch.constraints import Interval, GreaterThan
+
+def dom_period_initialization(dominant_period):
+    # Define kernel initial values based on the dominant period scale
+    if dominant_period < 1:
+        period_length_constraint = Interval(lower_bound=0.4, upper_bound=5, initial_value=dominant_period)
+        periodic_lengthscale_constraint = GreaterThan(lower_bound=0.1, initial_value=dominant_period)
+        rbf_lengthscale_constraint = GreaterThan(lower_bound=1, initial_value=dominant_period * 3)
+
+    elif dominant_period >= 1 and dominant_period < 4:
+        period_length_constraint = Interval(lower_bound=0.4, upper_bound=5, initial_value=dominant_period)
+        periodic_lengthscale_constraint = GreaterThan(lower_bound=0.2, initial_value=dominant_period / 2)
+        rbf_lengthscale_constraint = GreaterThan(lower_bound=1, initial_value=dominant_period * 2)
+
+    elif dominant_period >= 4 and dominant_period < 8:
+        period_length_constraint = Interval(lower_bound=dominant_period - 1, upper_bound= dominant_period + 1, initial_value=dominant_period)
+        periodic_lengthscale_constraint = GreaterThan(lower_bound=0.4, initial_value=dominant_period / 2)
+        rbf_lengthscale_constraint = GreaterThan(lower_bound=dominant_period/3, initial_value=dominant_period * 1.5)
+
+    else:
+        period_length_constraint = Interval(lower_bound=dominant_period - 2, upper_bound= dominant_period + 2, initial_value=dominant_period)
+        periodic_lengthscale_constraint = GreaterThan(lower_bound=0.4, initial_value=dominant_period)
+        rbf_lengthscale_constraint = GreaterThan(lower_bound=dominant_period/4, initial_value=dominant_period)
+
+    # Define the GP model
+    kernel = QuasiPeriodicKernel(
+        periodic_kernel=PeriodicKernel(
+            period_length_constraint=period_length_constraint, 
+            lengthscale_constraint=periodic_lengthscale_constraint
+        ),
+        rbf_kernel=RBFKernel(
+            lengthscale_constraint=rbf_lengthscale_constraint
+        )
+    )
+
+    return kernel
 
 # Create a Quasi-Periodic Kernel
 class QuasiPeriodicKernel(Kernel):
@@ -81,7 +117,7 @@ def train_gp(
         
     else:
         print("No likelihood specified. Using Gaussian likelihood.")
-        likelihood = gpytorch.likelihoods.GaussianLikelihood().to(device)
+        likelihood = GaussianLikelihood().to(device)
 
     # Initialize model
     if kernel is not None:

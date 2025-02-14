@@ -5,6 +5,87 @@ from scipy.signal import find_peaks, periodogram, windows, peak_prominences
 from scipy.ndimage import gaussian_filter1d
 from astropy.io import fits
 
+# Load and clean K2 data
+def load_k2_data(
+        filename,
+        scale = False,
+        normalize = False,
+        remove_outliers = False,
+    ):
+
+    fits_file = fits.open(filename)
+
+    # Load data
+    data = fits_file[1].data
+    time = np.array(data['TIME'])
+    pdc_flux = np.array(data['PDCSAP_FLUX'])*1.
+    pdc_err = np.array(data['PDCSAP_FLUX_ERR'])*1.
+
+    # Set x, y, and error
+    x = time
+    y = pdc_flux / np.nanmedian(pdc_flux)
+    y_err = pdc_err / np.nanmedian(pdc_flux)
+
+    # Clean
+    clean = ((y < 1.5) & (y > 0.5) & (y_err > 0.))
+    x = x[clean]
+    y = y[clean]
+    y_err = np.abs(y_err[clean]) 
+
+    # Shift to start at time 0
+    x = x - np.min(x)
+
+    # Bin to 30-minute cadence
+    num_bins = int(np.floor((np.max(x) - np.min(x)) * 48) + 1) # 48 bins per day
+    x_bins = np.min(x) + np.arange(num_bins + 1) / 48.
+    num_binned, bin_edges = np.histogram(x, bins= x_bins)
+    num_binned = np.array(num_binned)
+    y_binned, bin_edges = np.histogram(x, bins = x_bins, weights = y)
+    var_binned, bin_edges = np.histogram(x, bins = x_bins, weights= 1 / y_err**2)
+
+    # Where var_binned is 0, set to min value of var_binned
+    var_binned[var_binned == 0] = np.min(var_binned[var_binned > 0])
+    
+    y_err_binned = 1 / np.sqrt(np.array(var_binned))
+    y_binned = np.array(y_binned)
+    y_binned = y_binned / (num_binned + 0.001)
+    x_binned = x_bins[0:num_bins] + (x_bins[1] - x_bins[0]) / 2. 
+    x = x_binned
+    y = y_binned
+    y_err = y_err_binned
+
+    # Clean
+    clean = ((y > 0.) & ~np.isnan(y_err) & (y_err > 0.))
+    x = x[clean]
+    y = y[clean]
+    y_err = y_err[clean]
+
+    assert len(x) == len(y) == len(y_err), 'Lengths of x, y, and y_err must be the same'
+
+    # Scale data to be between 0 and 1
+    if scale:
+        y = (y - np.min(y)) / (np.max(y) - np.min(y))
+        y_err = y_err / (np.max(y) - np.min(y))
+
+    # Normalize data to have mean 0 and std of 1
+    if normalize:
+        mean_y = np.mean(y)
+        std_y = np.std(y)
+        y = (y - mean_y) / std_y
+        y_err = y_err / std_y
+
+    # Remove outliers (> 4 MAD)
+    if remove_outliers:
+        mad = np.median(np.abs(y - np.median(y)))
+        boundary = 4 * mad
+        outliers = np.where(np.abs(y) > boundary)
+
+        x = np.delete(x, outliers)
+        y = np.delete(y, outliers)
+        y_err = np.delete(y_err, outliers)
+
+    return x, y, y_err
+
 def freq_idx_to_period_days(freqs_idx, times):
     idx_day_scale_factor = (times[-1] - times[0]) / len(times)
     periods = 1 / freqs_idx
@@ -200,56 +281,3 @@ def inject_anomaly(
     y = y + anomaly
 
     return x, y, anomaly_locs, anomaly_amp, anomaly_fwhm
-
-# Load and clean K2 data
-def load_k2_data(filename):
-    fits_file = fits.open(filename)
-
-    # Load data
-    data = fits_file[1].data
-    time = np.array(data['TIME'])
-    pdc_flux = np.array(data['PDCSAP_FLUX'])*1.
-    pdc_err = np.array(data['PDCSAP_FLUX_ERR'])*1.
-
-    # Set x, y, and error
-    x = time
-    y = pdc_flux / np.nanmedian(pdc_flux)
-    y_err = pdc_err / np.nanmedian(pdc_flux)
-
-    # Clean
-    clean = ((y < 1.5) & (y > 0.5) & (y_err > 0.))
-    x = x[clean]
-    y = y[clean]
-    y_err = np.abs(y_err[clean]) 
-
-    # Shift to start at time 0
-    x = x - np.min(x)
-
-    # Bin to 30-minute cadence
-    num_bins = int(np.floor((np.max(x) - np.min(x)) * 48) + 1) # 48 bins per day
-    x_bins = np.min(x) + np.arange(num_bins + 1) / 48.
-    num_binned, bin_edges = np.histogram(x, bins= x_bins)
-    num_binned = np.array(num_binned)
-    y_binned, bin_edges = np.histogram(x, bins = x_bins, weights = y)
-    var_binned, bin_edges = np.histogram(x, bins = x_bins, weights= 1 / y_err**2)
-
-    # Where var_binned is 0, set to min value of var_binned
-    var_binned[var_binned == 0] = np.min(var_binned[var_binned > 0])
-    
-    y_err_binned = 1 / np.sqrt(np.array(var_binned))
-    y_binned = np.array(y_binned)
-    y_binned = y_binned / (num_binned + 0.001)
-    x_binned = x_bins[0:num_bins] + (x_bins[1] - x_bins[0]) / 2. 
-    x = x_binned
-    y = y_binned
-    y_err = y_err_binned
-
-    # Clean
-    clean = ((y > 0.) & ~np.isnan(y_err) & (y_err > 0.))
-    x = x[clean]
-    y = y[clean]
-    y_err = y_err[clean]
-
-    assert len(x) == len(y) == len(y_err), 'Lengths of x, y, and y_err must be the same'
-
-    return x, y, y_err
